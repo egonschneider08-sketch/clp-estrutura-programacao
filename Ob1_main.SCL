@@ -1,0 +1,131 @@
+(*=============================================================================
+  OB: OB1_Main
+  Descrição : Bloco de organização principal — ciclo de scan contínuo
+              Orquestra toda a lógica de controle e chama os FBs de dispositivo
+  Tipo      : OB MAIN PROGRAM CYCLE (OB1)
+  Projeto   : Equipe 3 — Blocos de Programação CLP
+  Versão    : 1.0.0
+  Data      : 2024-01-01
+  Autor     : Equipe 3
+
+  RESPONSABILIDADES DO OB1:
+    ✓ Chamar FB20 para controle do motor
+    ✓ Gerenciar habilitação geral do sistema
+    ✓ Lógica de intertravamento entre dispositivos
+    ✓ Gestão de alarmes consolidados
+    ✓ Mapeamento de I/O físico para DB Global
+
+  NÃO FAZER NO OB1:
+    ✗ Leituras/escritas analógicas (responsabilidade do OB30)
+    ✗ Cálculos matemáticos pesados (responsabilidade das FCs)
+    ✗ Temporização de processo longa (responsabilidade dos FBs)
+
+  MAPA DE I/O (adaptar ao hardware):
+    Entradas Digitais:
+      I0.0 = Botão PARTIDA Motor 1
+      I0.1 = Botão PARADA Motor 1 (NF)
+      I0.2 = Térmico Motor 1 (NF)
+      I0.3 = Sensor de Rotação Motor 1
+      I0.4 = Reset de Falha (geral)
+      I0.5 = Habilitação Geral (chave seletora)
+    Saídas Digitais:
+      Q0.0 = Contatora Motor 1
+      Q0.1 = Sinaleiro de Falha (vermelho)
+      Q0.2 = Sinaleiro Motor Rodando (verde)
+==============================================================================*)
+
+ORGANIZATION_BLOCK "OB1_Main"
+    TITLE = 'OB: Programa Principal — Ciclo de Scan'
+    VERSION : '1.0'
+
+VAR_TEMP
+    // Temporárias para lógica local
+    xQualquerFalha  : BOOL;    // OR de todas as falhas de dispositivos
+END_VAR
+
+BEGIN
+    // =========================================================================
+    // SEÇÃO 1 — Contador de ciclos (diagnóstico de performance)
+    // =========================================================================
+    "DB1_GlobalData".iCiclosOB1 := "DB1_GlobalData".iCiclosOB1 + 1;
+
+    // =========================================================================
+    // SEÇÃO 2 — Mapear entradas físicas para DB Global
+    //   Centralizar o mapeamento de I/O em um único local facilita
+    //   manutenção e substituição de hardware
+    // =========================================================================
+    // Leitura do estado de habilitação geral (chave seletora física)
+    // "DB1_GlobalData".xSistemaHabilitado := I0.5;
+
+    // =========================================================================
+    // SEÇÃO 3 — Lógica de Habilitação e Segurança
+    //   Sistema só opera se habilitado E sem alarme crítico (de sinal analógico)
+    // =========================================================================
+    IF NOT "DB1_GlobalData".xSistemaHabilitado
+       OR "DB1_GlobalData".xAlarmeCritico
+    THEN
+        // Sistema desabilitado: forçar saídas seguras
+        // Q0.0 := FALSE;  // Desliga contatora (proteção em hardware)
+        ;   // No TIA Portal, saídas físicas são gerenciadas pelo FB
+    END_IF;
+
+    // =========================================================================
+    // SEÇÃO 4 — Chamar FB20: Controle Motor 1
+    //   Cada chamada de FB usa seu próprio Instance DB
+    //   Motor 1 → DB20_MotorInstance
+    // =========================================================================
+    "FB20_ControleMotor"."DB20_MotorInstance"(
+        // Entradas físicas (I/O mapping)
+        xPartida       := I0.0,         // Botão partida físico
+        xParada        := I0.1,         // Botão parada NF físico
+        xFalhaTermica  := I0.2,         // Relé térmico NF físico
+        xSensorRotacao := I0.3,         // Sensor de rotação
+        xResetFalha    := I0.4,         // Botão de reset
+        tTempoPartida  := T#3S,         // 3 segundos para confirmar partida
+        tTempoReengage := T#10S,        // 10 segundos após falha
+
+        // Saídas físicas
+        xContatora     => Q0.0,         // Contatora principal Motor 1
+        xMotorRodando  => Q0.2,         // Sinaleiro verde
+        xFalhaAtiva    => Q0.1          // Sinaleiro vermelho de falha
+        // iEstado e iContadorFalhas ficam no Instance DB → acessíveis via HMI
+    );
+
+    // EXEMPLO: Motor 2 (caso exista) — usar Instance DB diferente!
+    // "FB20_ControleMotor"."DB21_Motor2"(
+    //     xPartida       := I1.0,
+    //     xParada        := I1.1,
+    //     ...
+    // );
+
+    // =========================================================================
+    // SEÇÃO 5 — Consolidação de Alarmes
+    // =========================================================================
+    xQualquerFalha := "DB20_MotorInstance".xFalhaAtiva;
+    //                OR "DB21_Motor2".xFalhaAtiva         // adicionar outros motores
+    //                OR "DB1_GlobalData".xAlarmeCritico;  // falha analógica
+
+    // Se qualquer dispositivo em falha, registrar no DB Global
+    IF xQualquerFalha AND NOT "DB1_GlobalData".xAlarmeCritico THEN
+        "DB1_GlobalData".xAlarmeCritico := TRUE;
+        "DB1_GlobalData".iCodigoAlarme  := 200;   // Código: falha de dispositivo
+    ELSIF NOT xQualquerFalha THEN
+        // Limpar alarme de dispositivo (alarme de sinal é gerenciado pelo OB30)
+        IF "DB1_GlobalData".iCodigoAlarme = 200 THEN
+            "DB1_GlobalData".xAlarmeCritico := FALSE;
+            "DB1_GlobalData".iCodigoAlarme  := 0;
+        END_IF;
+    END_IF;
+
+    // =========================================================================
+    // SEÇÃO 6 — Intertravamentos (exemplo de segurança entre dispositivos)
+    //   Regra: Motor 1 só pode partir se pressão < 5.0 bar
+    // =========================================================================
+    IF "DB1_GlobalData".rPressao_PV > 5.0 THEN
+        // Bloquear partida forçando sinal de parada
+        // (Na prática: usar relé de segurança em hardware, não só software)
+        // I0.0 não pode ser forçado via software — usar lógica no FB ou intertravamento
+        ;  // Placeholder: adicionar lógica de intertravamento aqui
+    END_IF;
+
+END_ORGANIZATION_BLOCK

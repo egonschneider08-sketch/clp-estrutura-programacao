@@ -1,0 +1,131 @@
+(*=============================================================================
+  FC: FC10_Calculo
+  Descrição : Cálculo de controle — Conversão de sinal analógico + 
+              controlador proporcional com saturação de saída
+  Tipo      : FC — Function (SEM memória interna)
+  Projeto   : Equipe 3 — Blocos de Programação CLP
+  Versão    : 1.0.0
+  Data      : 2024-01-01
+  Autor     : Equipe 3
+
+  DIFERENCIAL FC vs FB:
+    - FC não possui Instance DB → sem memória entre ciclos
+    - Resultado depende SOMENTE dos parâmetros de entrada
+    - Ideal para: conversões, cálculos matemáticos puros, normalização
+    - Pode ser chamado múltiplas vezes no mesmo ciclo com parâmetros diferentes
+
+  INTERFACE:
+    Entradas:
+      rValorRaw      : Valor bruto do ADC (0 a 27648 para Siemens S7)
+      rRangeMin_EU   : Limite inferior em unidade de engenharia
+      rRangeMax_EU   : Limite superior em unidade de engenharia
+      rSetpoint      : Valor desejado (SP) em unidade de engenharia
+      rGanho_Kp      : Ganho proporcional do controlador
+      rSaidaMin      : Limite mínimo da saída (ex: 0.0)
+      rSaidaMax      : Limite máximo da saída (ex: 100.0)
+    Saídas:
+      rValor_EU      : Valor convertido para unidade de engenharia
+      rErro          : Erro calculado (SP - PV)
+      rSaidaControle : Saída do controlador saturada
+      xSinalValido   : TRUE se o sinal está dentro da faixa esperada
+==============================================================================*)
+
+FUNCTION "FC10_Calculo" : VOID
+    TITLE = 'FC: Cálculo — Conversão Analógica + Controlador P'
+    VERSION : '1.0'
+
+VAR_INPUT
+    rValorRaw       : REAL;     // Valor bruto ADC (0–27648 tipico S7-1200/1500)
+    rRangeMin_EU    : REAL;     // Ex: 0.0 (para 4mA ou 0V)
+    rRangeMax_EU    : REAL;     // Ex: 100.0 (para 20mA ou 10V)
+    rSetpoint       : REAL;     // Valor desejado SP
+    rGanho_Kp       : REAL;     // Ganho proporcional (ex: 1.5)
+    rSaidaMin       : REAL;     // Limite mínimo da saída (ex: 0.0)
+    rSaidaMax       : REAL;     // Limite máximo da saída (ex: 100.0)
+END_VAR
+
+VAR_OUTPUT
+    rValor_EU       : REAL;     // Valor em unidade de engenharia
+    rErro           : REAL;     // Erro: SP - PV
+    rSaidaControle  : REAL;     // Saída do controlador (saturada)
+    xSinalValido    : BOOL;     // Diagnóstico: sinal dentro da faixa
+END_VAR
+
+VAR_TEMP
+    rRawMin         : REAL;     // Constante: mínimo ADC Siemens
+    rRawMax         : REAL;     // Constante: máximo ADC Siemens
+    rSpan_Raw       : REAL;     // Span do ADC
+    rSpan_EU        : REAL;     // Span da unidade de engenharia
+    rSaidaCalculada : REAL;     // Valor calculado antes da saturação
+END_VAR
+
+BEGIN
+    // =========================================================================
+    // PASSO 1 — Definir constantes ADC (Siemens S7-1200/1500)
+    //   Sinal 0–10V ou 4–20mA → representado como 0 a 27648
+    //   Sinal ±10V bipolar   → representado como -27648 a +27648
+    // =========================================================================
+    rRawMin := 0.0;
+    rRawMax := 27648.0;
+
+    // =========================================================================
+    // PASSO 2 — Validação do sinal (diagnóstico)
+    //   Tolerância de ±5% abaixo do mínimo e ±10% acima do máximo
+    //   para detectar fio partido (< -1384) ou curto-circuito (> 30412)
+    // =========================================================================
+    IF (rValorRaw >= -1384.0) AND (rValorRaw <= 30412.0) THEN
+        xSinalValido := TRUE;
+    ELSE
+        xSinalValido := FALSE;
+        rValor_EU       := 0.0;
+        rErro           := 0.0;
+        rSaidaControle  := 0.0;
+        RETURN;   // Sair sem calcular se sinal inválido
+    END_IF;
+
+    // =========================================================================
+    // PASSO 3 — Conversão Linear: RAW → Unidade de Engenharia
+    //   Fórmula: EU = ((Raw - RawMin) / (RawMax - RawMin)) * (EUmax - EUmin) + EUmin
+    // =========================================================================
+    rSpan_Raw := rRawMax - rRawMin;
+    rSpan_EU  := rRangeMax_EU - rRangeMin_EU;
+
+    IF rSpan_Raw = 0.0 THEN
+        // Proteção contra divisão por zero
+        rValor_EU := rRangeMin_EU;
+    ELSE
+        rValor_EU := ((rValorRaw - rRawMin) / rSpan_Raw) * rSpan_EU + rRangeMin_EU;
+    END_IF;
+
+    // =========================================================================
+    // PASSO 4 — Clamping do valor EU nos limites configurados
+    // =========================================================================
+    IF rValor_EU < rRangeMin_EU THEN
+        rValor_EU := rRangeMin_EU;
+    ELSIF rValor_EU > rRangeMax_EU THEN
+        rValor_EU := rRangeMax_EU;
+    END_IF;
+
+    // =========================================================================
+    // PASSO 5 — Cálculo do Erro
+    // =========================================================================
+    rErro := rSetpoint - rValor_EU;
+
+    // =========================================================================
+    // PASSO 6 — Ação de Controle Proporcional
+    //   Saída = Kp * Erro
+    // =========================================================================
+    rSaidaCalculada := rGanho_Kp * rErro;
+
+    // =========================================================================
+    // PASSO 7 — Saturação da Saída (Anti-windup básico para estágio P)
+    // =========================================================================
+    IF rSaidaCalculada < rSaidaMin THEN
+        rSaidaControle := rSaidaMin;
+    ELSIF rSaidaCalculada > rSaidaMax THEN
+        rSaidaControle := rSaidaMax;
+    ELSE
+        rSaidaControle := rSaidaCalculada;
+    END_IF;
+
+END_FUNCTION

@@ -1,0 +1,64 @@
+(*=============================================================================
+  OB: OB100_Startup
+  Descrição : Bloco de inicialização — executado UMA ÚNICA VEZ na partida do CLP
+              (warm restart ou cold restart). Garante estado inicial seguro.
+  Tipo      : OB STARTUP (OB100)
+  Projeto   : Equipe 3 — Blocos de Programação CLP
+  Versão    : 1.0.0
+  Data      : 2024-01-01
+  Autor     : Equipe 3
+
+  QUANDO EXECUTA: 
+    - Power ON do CLP
+    - Saída do modo STOP para RUN
+    - Download de novo programa
+    
+  NÃO EXECUTA:
+    - Ciclos normais de scan (isso é função do OB1)
+    - Interrupções de hardware
+==============================================================================*)
+
+ORGANIZATION_BLOCK "OB100_Startup"
+    TITLE = 'OB: Inicialização do Sistema'
+    VERSION : '1.0'
+
+VAR_TEMP
+    // Variáveis temporárias de inicialização
+    xInicializacaoOK : BOOL;
+END_VAR
+
+BEGIN
+    // =========================================================================
+    // PASSO 1 — Estado seguro inicial: desabilitar sistema
+    // =========================================================================
+    "DB1_GlobalData".xSistemaHabilitado  := FALSE;
+    "DB1_GlobalData".xModoManual         := TRUE;   // Sempre inicia em manual
+    "DB1_GlobalData".xAlarmeCritico      := FALSE;
+    "DB1_GlobalData".iCodigoAlarme       := 0;
+
+    // =========================================================================
+    // PASSO 2 — Zerar contadores e acumuladores
+    // =========================================================================
+    "DB1_GlobalData".iCiclosOB1         := 0;
+    "DB1_GlobalData".iCiclosOB30        := 0;
+    "DB1_GlobalData".rErroAcumulado     := 0.0;
+    "DB1_GlobalData".rSaidaControle     := 0.0;
+
+    // =========================================================================
+    // PASSO 3 — Setpoint padrão de segurança
+    // =========================================================================
+    "DB1_GlobalData".rTemperatura_SP    := 25.0;   // 25°C padrão de segurança
+
+    // =========================================================================
+    // PASSO 4 — Registrar timestamp de inicialização
+    // =========================================================================
+    "DB1_GlobalData".dtUltimaInicializacao := DT#2024-01-01-00:00:00;
+    // NOTA: Em produção substituir por: READ_CLK(CDT => "DB1_GlobalData".dtUltimaInicializacao)
+
+    // =========================================================================
+    // PASSO 5 — Log de diagnóstico (pode-se adicionar escrita em DB de log)
+    // =========================================================================
+    xInicializacaoOK := TRUE;
+    // Em projetos maiores: chamar FC de logging aqui
+
+END_ORGANIZATION_BLOCK

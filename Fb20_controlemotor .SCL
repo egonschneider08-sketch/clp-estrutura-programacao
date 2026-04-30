@@ -1,0 +1,248 @@
+(*=============================================================================
+  FB: FB20_ControleMotor
+  Descrição : Controle de motor elétrico com máquina de estados,
+              temporização de partida, detecção de falha e contador de falhas
+  Tipo      : FB — Function Block (COM memória → Instance DB)
+  Projeto   : Equipe 3 — Blocos de Programação CLP
+  Versão    : 1.0.0
+  Data      : 2024-01-01
+  Autor     : Equipe 3
+
+  DIFERENCIAL FC vs FB:
+    - FB possui Instance DB → variáveis STATIC sobrevivem entre ciclos de scan
+    - Permite implementar máquinas de estado, temporizações e acumuladores
+    - Cada motor do sistema cria sua própria instância (DB20, DB21, DB22...)
+    - Parâmetros podem ser diferentes por instância
+
+  MÁQUINA DE ESTADOS:
+    0 = REPOUSO     → aguardando comando de partida
+    1 = PARTINDO    → contatora energizada, aguardando confirmação de rotação
+    2 = RODANDO     → motor confirmado em operação normal
+    3 = PARANDO     → contatora desligada, aguardando parada total
+    4 = FALHA       → falha detectada, aguardando reset + timeout
+
+  ENTRADAS DE SEGURANÇA (contatos NF — Normalmente Fechados):
+    xParada       : FALSE = botão de parada pressionado
+    xFalhaTermica : FALSE = térmico disparado (sobrecarga)
+==============================================================================*)
+
+FUNCTION_BLOCK "FB20_ControleMotor"
+    TITLE = 'FB: Controle de Motor com Máquina de Estados'
+    VERSION : '1.0'
+
+// =============================================================================
+// INTERFACE
+// =============================================================================
+VAR_INPUT
+    xPartida        : BOOL;     // Comando de partida (borda de subida)
+    xParada         : BOOL;     // Comando de parada NF (FALSE = parar)
+    xFalhaTermica   : BOOL;     // Relé térmico NF (FALSE = falha)
+    xSensorRotacao  : BOOL;     // Confirmação de rotação (TRUE = girando)
+    xResetFalha     : BOOL;     // Reset manual de falha (borda de subida)
+    tTempoPartida   : TIME;     // Timeout de confirmação de partida
+    tTempoReengage  : TIME;     // Tempo mínimo após falha para nova partida
+END_VAR
+
+VAR_OUTPUT
+    xContatora      : BOOL;     // Aciona contatora principal (saída digital)
+    xMotorRodando   : BOOL;     // Status confirmado de operação
+    xFalhaAtiva     : BOOL;     // Falha presente (alarme)
+    iEstado         : INT;      // Estado atual (para SCADA/HMI)
+    iContadorFalhas : INT;      // Total de falhas acumuladas (histórico)
+END_VAR
+
+VAR    // STATIC — persiste no Instance DB entre ciclos de scan
+    // Temporizadores internos
+    tonPartida      : TON;      // Timer de timeout de partida
+    tonReengage     : TON;      // Timer de espera pós-falha
+    tonParada       : TON;      // Timer de confirmação de parada total
+
+    // Detecção de bordas (edge detection)
+    xPartida_R      : R_TRIG;   // Borda de subida — comando de partida
+    xReset_R        : R_TRIG;   // Borda de subida — reset de falha
+
+    // Estado interno da máquina
+    iEstadoInterno  : INT;      // Variável interna do estado atual
+
+    // Flags auxiliares
+    xFalhaInterna   : BOOL;     // Flag interna de falha consolidada
+END_VAR
+
+VAR_TEMP    // TEMP — recalculado a cada ciclo (não persistente)
+    xFalhaThermica_Det  : BOOL; // Falha térmica detectada neste ciclo
+    xSemRotacao_Det     : BOOL; // Ausência de rotação no estado RODANDO
+END_VAR
+
+// =============================================================================
+// CONSTANTES DE ESTADO (para legibilidade)
+// =============================================================================
+VAR CONSTANT
+    cREPOUSO    : INT := 0;
+    cPARTINDO   : INT := 1;
+    cRODANDO    : INT := 2;
+    cPARANDO    : INT := 3;
+    cFALHA      : INT := 4;
+END_VAR
+
+BEGIN
+    // =========================================================================
+    // BLOCO 1 — Detecção de Bordas
+    // =========================================================================
+    xPartida_R(CLK := xPartida);
+    xReset_R(CLK := xResetFalha);
+
+    // =========================================================================
+    // BLOCO 2 — Detecção de Condições de Falha
+    // =========================================================================
+    // Falha térmica: NF → FALSE = relé disparado
+    xFalhaThermica_Det := NOT xFalhaTermica;
+
+    // Motor deveria estar girando mas sensor não confirma (somente no estado RODANDO)
+    xSemRotacao_Det := (iEstadoInterno = cRODANDO) AND (NOT xSensorRotacao);
+
+    // =========================================================================
+    // BLOCO 3 — MÁQUINA DE ESTADOS PRINCIPAL
+    // =========================================================================
+    CASE iEstadoInterno OF
+
+        // ---------------------------------------------------------------------
+        // ESTADO 0: REPOUSO
+        // Motor parado, sistema aguardando comando
+        // ---------------------------------------------------------------------
+        cREPOUSO:
+            xContatora     := FALSE;
+            xMotorRodando  := FALSE;
+
+            // Transição → PARTINDO
+            // Condição: borda de subida em Partida + botão Parada não pressionado
+            //           + sem falha ativa + sistema habilitado
+            IF xPartida_R.Q
+               AND xParada            // NF: deve estar TRUE (não pressionado)
+               AND xFalhaTermica      // NF: deve estar TRUE (OK)
+               AND NOT xFalhaInterna  // sem falha pendente
+            THEN
+                iEstadoInterno := cPARTINDO;
+                tonPartida(IN := FALSE, PT := tTempoPartida); // Reset timer
+            END_IF;
+
+        // ---------------------------------------------------------------------
+        // ESTADO 1: PARTINDO
+        // Contatora energizada, aguardando confirmação de rotação
+        // ---------------------------------------------------------------------
+        cPARTINDO:
+            xContatora    := TRUE;
+            xMotorRodando := FALSE;
+
+            // Timer de supervisão de partida
+            tonPartida(IN := TRUE, PT := tTempoPartida);
+
+            // Transição → RODANDO: sensor confirma rotação dentro do tempo
+            IF xSensorRotacao THEN
+                iEstadoInterno := cRODANDO;
+                tonPartida(IN := FALSE, PT := tTempoPartida);
+
+            // Transição → FALHA: tempo excedido sem confirmação de rotação
+            ELSIF tonPartida.Q THEN
+                xFalhaInterna  := TRUE;
+                iContadorFalhas := iContadorFalhas + 1;
+                iEstadoInterno := cFALHA;
+                tonPartida(IN := FALSE, PT := tTempoPartida);
+
+            // Transição → PARANDO: botão de parada ou falha térmica durante partida
+            ELSIF NOT xParada OR xFalhaThermica_Det THEN
+                IF xFalhaThermica_Det THEN
+                    xFalhaInterna   := TRUE;
+                    iContadorFalhas := iContadorFalhas + 1;
+                    iEstadoInterno  := cFALHA;
+                ELSE
+                    iEstadoInterno := cPARANDO;
+                END_IF;
+                tonPartida(IN := FALSE, PT := tTempoPartida);
+            END_IF;
+
+        // ---------------------------------------------------------------------
+        // ESTADO 2: RODANDO
+        // Motor em operação normal confirmada
+        // ---------------------------------------------------------------------
+        cRODANDO:
+            xContatora    := TRUE;
+            xMotorRodando := TRUE;
+
+            // Transição → PARANDO: comando de parada normal
+            IF NOT xParada THEN
+                xMotorRodando  := FALSE;
+                iEstadoInterno := cPARANDO;
+
+            // Transição → FALHA: falha térmica ou perda de rotação
+            ELSIF xFalhaThermica_Det OR xSemRotacao_Det THEN
+                xContatora      := FALSE;
+                xMotorRodando   := FALSE;
+                xFalhaInterna   := TRUE;
+                iContadorFalhas := iContadorFalhas + 1;
+                iEstadoInterno  := cFALHA;
+            END_IF;
+
+        // ---------------------------------------------------------------------
+        // ESTADO 3: PARANDO
+        // Contatora desligada, aguardando confirmação de parada total
+        // ---------------------------------------------------------------------
+        cPARANDO:
+            xContatora    := FALSE;
+            xMotorRodando := FALSE;
+
+            // Timer de confirmação de parada
+            tonParada(IN := TRUE, PT := T#2S);
+
+            // Transição → REPOUSO: sensor confirma parada OU timeout
+            IF NOT xSensorRotacao OR tonParada.Q THEN
+                tonParada(IN := FALSE, PT := T#2S);
+                iEstadoInterno := cREPOUSO;
+            END_IF;
+
+            // Transição → FALHA: se falha térmica ocorre durante parada
+            IF xFalhaThermica_Det THEN
+                xFalhaInterna   := TRUE;
+                iContadorFalhas := iContadorFalhas + 1;
+                tonParada(IN := FALSE, PT := T#2S);
+                iEstadoInterno := cFALHA;
+            END_IF;
+
+        // ---------------------------------------------------------------------
+        // ESTADO 4: FALHA
+        // Sistema em falha — bloqueado até reset manual + timeout
+        // ---------------------------------------------------------------------
+        cFALHA:
+            xContatora    := FALSE;
+            xMotorRodando := FALSE;
+            xFalhaAtiva   := TRUE;
+
+            // Timer de espera pós-falha (evita re-partida imediata)
+            tonReengage(IN := TRUE, PT := tTempoReengage);
+
+            // Transição → REPOUSO: reset manual + timeout cumprido + falha resolvida
+            IF xReset_R.Q
+               AND tonReengage.Q
+               AND xFalhaTermica   // Térmico deve estar restabelecido
+            THEN
+                xFalhaInterna  := FALSE;
+                xFalhaAtiva    := FALSE;
+                tonReengage(IN := FALSE, PT := tTempoReengage);
+                iEstadoInterno := cREPOUSO;
+            END_IF;
+
+        // ---------------------------------------------------------------------
+        // DEFAULT: Estado desconhecido → forçar REPOUSO (segurança)
+        // ---------------------------------------------------------------------
+        ELSE
+            xContatora     := FALSE;
+            xMotorRodando  := FALSE;
+            iEstadoInterno := cREPOUSO;
+
+    END_CASE;
+
+    // =========================================================================
+    // BLOCO 4 — Atualizar saída de estado para HMI/SCADA
+    // =========================================================================
+    iEstado := iEstadoInterno;
+
+END_FUNCTION_BLOCK

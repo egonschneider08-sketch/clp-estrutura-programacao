@@ -1,0 +1,59 @@
+(*=============================================================================
+  DB: DB1_GlobalData
+  Descrição : Data Block global — dados compartilhados entre todos os blocos
+  Tipo      : Global DB (não vinculado a FB)
+  Projeto   : Equipe 3 — Blocos de Programação CLP
+  Versão    : 1.0.0
+  Data      : 2024-01-01
+  Autor     : Equipe 3
+  
+  NOTA: Este DB é acessado por todos os OBs, FCs e FBs do projeto.
+        Variáveis aqui são persistentes (retentivas) entre ciclos e
+        sobrevivem a power cycles se configuradas como RETAIN.
+==============================================================================*)
+
+DATA_BLOCK "DB1_GlobalData"
+    TITLE = 'Dados Globais do Processo'
+
+    VAR
+        // =====================================================================
+        // SEÇÃO 1 — Dados do Processo
+        // =====================================================================
+        rTemperatura_PV     : REAL;     // Temperatura processo (ºC) — valor lido
+        rTemperatura_SP     : REAL;     // Temperatura setpoint (ºC)
+        rPressao_PV         : REAL;     // Pressão processo (bar)
+        rVazao_PV           : REAL;     // Vazão processo (L/min)
+
+        // =====================================================================
+        // SEÇÃO 2 — Saídas Calculadas (escritas pela FC10)
+        // =====================================================================
+        rSaidaControle      : REAL;     // Saída do cálculo de controle (0–100%)
+        rErro               : REAL;     // Erro atual: SP - PV
+        rErroAcumulado      : REAL;     // Erro acumulado (integral)
+        rSaidaAnalogica_EU  : REAL;     // Saída convertida em unidade de engenharia
+
+        // =====================================================================
+        // SEÇÃO 3 — Status Geral da Planta
+        // =====================================================================
+        xSistemaHabilitado  : BOOL;     // Habilitação geral do sistema
+        xModoManual         : BOOL;     // TRUE = manual | FALSE = automático
+        xAlarmeCritico      : BOOL;     // Alarme crítico ativo (qualquer)
+        iCodigoAlarme       : INT;      // Código do último alarme (0 = sem alarme)
+
+        // =====================================================================
+        // SEÇÃO 4 — Dados de Diagnóstico e Versionamento
+        // =====================================================================
+        iCiclosOB1          : DINT;     // Contador de ciclos do OB1
+        iCiclosOB30         : DINT;     // Contador de ciclos do OB30
+        rTempoUltimoCiclo   : REAL;     // Tempo do último ciclo OB1 (ms)
+        dtUltimaInicializacao : DATE_AND_TIME; // Timestamp da última inicialização
+
+    END_VAR
+
+BEGIN
+    // Valores iniciais
+    rTemperatura_SP     := 25.0;    // Setpoint padrão: 25°C
+    xSistemaHabilitado  := FALSE;   // Sistema desabilitado no boot
+    xModoManual         := TRUE;    // Inicia em modo manual (segurança)
+    iCodigoAlarme       := 0;
+END_DATA_BLOCK

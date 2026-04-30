@@ -1,0 +1,32 @@
+(*=============================================================================
+  DB: DB20_MotorInstance
+  Descrição : Instance Data Block para o FB20_ControleMotor
+  Tipo      : Instance DB (vinculado ao FB20)
+  Projeto   : Equipe 3 — Blocos de Programação CLP
+  Versão    : 1.0.0
+  Data      : 2024-01-01
+  Autor     : Equipe 3
+
+  NOTA: Este DB é criado automaticamente pelo TIA Portal ao instanciar o FB20.
+        Cada motor do sistema deve ter seu próprio Instance DB.
+        Exemplo de múltiplas instâncias:
+          DB20 → Motor 1 (Bomba de Água)
+          DB21 → Motor 2 (Exaustor)
+          DB22 → Motor 3 (Esteira)
+==============================================================================*)
+
+DATA_BLOCK "DB20_MotorInstance"
+    FB "FB20_ControleMotor"
+
+    VAR_INPUT
+        xPartida        := FALSE;
+        xParada         := TRUE;    // NF: TRUE = circuito fechado (normal)
+        xFalhaTermica   := TRUE;    // NF: TRUE = térmico OK
+        tTempoPartida   := T#3S;    // 3 segundos para confirmar partida
+        tTempoReengage  := T#10S;   // 10 segundos após falha para tentar novamente
+    END_VAR
+
+BEGIN
+    // Instance DB não precisa de BEGIN/END explícito no TIA Portal
+    // Os valores acima definem os valores padrão dos parâmetros
+END_DATA_BLOCK

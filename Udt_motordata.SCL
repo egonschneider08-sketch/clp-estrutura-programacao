@@ -1,0 +1,32 @@
+(*=============================================================================
+  UDT: UDT_MotorData
+  Descrição : Tipo de dado estruturado para controle de motor
+  Projeto   : Equipe 3 — Blocos de Programação CLP
+  Versão    : 1.0.0
+  Data      : 2024-01-01
+  Autor     : Equipe 3
+==============================================================================*)
+
+TYPE "UDT_MotorData"
+    STRUCT
+        // --- Entradas do Motor ---
+        xPartida        : BOOL;     // Comando de partida
+        xParada         : BOOL;     // Comando de parada (NF = TRUE em repouso)
+        xFalhaTermica   : BOOL;     // Relé térmico disparado (NF)
+        xSensorRotacao  : BOOL;     // Feedback de rotação (encoder/proximidade)
+
+        // --- Saídas do Motor ---
+        xContatora      : BOOL;     // Aciona contatora principal
+        xSinalFalha     : BOOL;     // Sinalização de falha (alarme)
+        xMotorRodando   : BOOL;     // Status: motor em operação
+
+        // --- Parâmetros de Configuração ---
+        tTempoPartida   : TIME;     // Tempo máx para confirmar partida (default 3s)
+        tTempoReengage  : TIME;     // Tempo de espera para novo comando após falha
+
+        // --- Diagnóstico ---
+        iContadorFalhas : INT;      // Número de falhas acumuladas
+        iEstado         : INT;      // Estado atual da máquina de estados
+        tTempoNoEstado  : TIME;     // Tempo decorrido no estado atual
+    END_STRUCT;
+END_TYPE

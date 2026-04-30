@@ -1,0 +1,92 @@
+(*=============================================================================
+  OB: OB30_CyclicInt
+  Descrição : Interrupção cíclica — executa a cada 500ms (configurável no TIA)
+              Responsável pelas leituras analógicas e chamada da FC de cálculo
+  Tipo      : OB CYCLIC INTERRUPT (OB30)
+  Projeto   : Equipe 3 — Blocos de Programação CLP
+  Versão    : 1.0.0
+  Data      : 2024-01-01
+  Autor     : Equipe 3
+
+  QUANDO EXECUTA:
+    - Interrupção de hardware a cada 500ms (independente do ciclo OB1)
+    - Prioridade maior que OB1 → interrompe o scan principal
+    
+  POR QUE 500ms PARA ANALOGICOS:
+    - Sensores industriais (PT100, 4-20mA) tipicamente tem resposta em 100-500ms
+    - Evita processamento desnecessário em cada scan do OB1 (pode ser <10ms)
+    - Separa clareza de responsabilidades: OB30 = aquisição, OB1 = lógica
+==============================================================================*)
+
+ORGANIZATION_BLOCK "OB30_CyclicInt"
+    TITLE = 'OB: Interrupção Cíclica 500ms — Aquisição e Cálculo'
+    VERSION : '1.0'
+
+VAR_TEMP
+    // Saídas temporárias da FC10 (recebidas por referência)
+    rValorConvertido    : REAL;
+    rErroCalculado      : REAL;
+    rSaidaControle      : REAL;
+    xSinalValido        : BOOL;
+END_VAR
+
+BEGIN
+    // =========================================================================
+    // PASSO 1 — Contar ciclos (diagnóstico)
+    // =========================================================================
+    "DB1_GlobalData".iCiclosOB30 := "DB1_GlobalData".iCiclosOB30 + 1;
+
+    // =========================================================================
+    // PASSO 2 — Leitura de entradas analógicas (simulado)
+    //   Em produção: substituir por leitura real dos módulos de I/O
+    //   Exemplo real: "DB1_GlobalData".rTemperatura_PV := INT_TO_REAL(IW64);
+    //                 "DB1_GlobalData".rPressao_PV     := INT_TO_REAL(IW66);
+    //
+    //   IW64, IW66 = endereços dos canais analógicos no rack do CLP
+    // =========================================================================
+    // (Leituras simuladas — substituir por endereços reais do projeto)
+    // "DB1_GlobalData".rTemperatura_PV := INT_TO_REAL(IW64);
+    // "DB1_GlobalData".rPressao_PV     := INT_TO_REAL(IW66);
+
+    // =========================================================================
+    // PASSO 3 — Chamar FC10 para converter e calcular controle de temperatura
+    //   FC10 é STATELESS: chamada com parâmetros explícitos a cada ciclo
+    //   Note: mesmo FC pode ser chamado novamente abaixo para pressão (reutilização)
+    // =========================================================================
+    "FC10_Calculo"(
+        rValorRaw      := "DB1_GlobalData".rTemperatura_PV,  // PV bruta (ADC)
+        rRangeMin_EU   := 0.0,      // 0°C → corresponde a 4mA / 0 ADC
+        rRangeMax_EU   := 100.0,    // 100°C → corresponde a 20mA / 27648 ADC
+        rSetpoint      := "DB1_GlobalData".rTemperatura_SP,
+        rGanho_Kp      := 1.5,      // Ganho proporcional
+        rSaidaMin      := 0.0,      // Saída mínima: 0%
+        rSaidaMax      := 100.0,    // Saída máxima: 100%
+        rValor_EU      => rValorConvertido,     // Temperatura em °C
+        rErro          => rErroCalculado,       // Erro SP - PV
+        rSaidaControle => rSaidaControle,       // Saída 0-100%
+        xSinalValido   => xSinalValido          // Diagnóstico do sinal
+    );
+
+    // =========================================================================
+    // PASSO 4 — Gravar resultados no DB Global (disponível para OB1 e HMI)
+    // =========================================================================
+    IF xSinalValido THEN
+        "DB1_GlobalData".rTemperatura_PV  := rValorConvertido;
+        "DB1_GlobalData".rErro            := rErroCalculado;
+        "DB1_GlobalData".rSaidaControle   := rSaidaControle;
+        "DB1_GlobalData".xAlarmeCritico   := FALSE;
+    ELSE
+        // Sinal analógico com falha → alarme crítico
+        "DB1_GlobalData".xAlarmeCritico   := TRUE;
+        "DB1_GlobalData".iCodigoAlarme    := 100;  // Código: falha de sinal analógico
+        "DB1_GlobalData".rSaidaControle   := 0.0;  // Saída segura = 0
+    END_IF;
+
+    // =========================================================================
+    // PASSO 5 — Escrever saída analógica (simulado)
+    //   Em produção: QW80 = canal analógico de saída (4-20mA / 0-10V)
+    //   Converter 0-100% → 0-27648 (escala DAC Siemens)
+    // =========================================================================
+    // QW80 := REAL_TO_INT("DB1_GlobalData".rSaidaControle * 276.48);
+
+END_ORGANIZATION_BLOCK
