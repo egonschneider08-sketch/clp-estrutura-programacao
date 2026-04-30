@@ -93,18 +93,7 @@ INTERRUPÇÃO CÍCLICA (a cada 500ms)
 | `ton`   | TON timer     | `tonPartida`        |
 | `c`     | CONSTANT      | `cRODANDO`          |
 
-## Como versionar com Git
-
-```bash
-# Inicializar repositório
-git init
-git add .
-git commit -m "feat(motor): máquina de estados FB20 v1.0"
-
-# Criar branch para nova feature
-git checkout -b feature/FB21-bomba
-# ... editar arquivos ...
-git commit -m "feat(bomba): adicionar FB21 para controle de bomba"
+role de bomba"
 
 # Tags de versão para cada release de produção
 git tag -a v1.0.0 -m "Release inicial — 1 motor, 1 loop de temperatura"
