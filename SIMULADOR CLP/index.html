@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLP Simulator — Equipe 3</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<header class="header">
+    <div class="header-left">
+        <div class="header-logo">
+            <div class="logo-icon">
+                <div class="logo-cpu">
+                    <div class="cpu-pin top"></div>
+                    <div class="cpu-pin top"></div>
+                    <div class="cpu-pin top"></div>
+                    <div class="cpu-core">CLP</div>
+                    <div class="cpu-pin bottom"></div>
+                    <div class="cpu-pin bottom"></div>
+                    <div class="cpu-pin bottom"></div>
+                </div>
+            </div>
+            <div>
+                <div class="logo-title">CLP SIMULATOR</div>
+                <div class="logo-sub">TIA Portal · SCL · IEC 61131-3</div>
+            </div>
+        </div>
+    </div>
+    <div class="header-center">
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot" id="hdr-run-dot"></div>
+                <span id="hdr-run-label">STOP</span>
+            </div>
+            <div class="status-sep"></div>
+            <div class="status-item">
+                <span class="status-muted">CICLOS OB1</span>
+                <span class="status-val mono" id="hdr-cycles">0</span>
+            </div>
+            <div class="status-sep"></div>
+            <div class="status-item">
+                <span class="status-muted">MOTOR</span>
+                <span class="status-val mono" id="hdr-motor">REPOUSO</span>
+            </div>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="tag">EQUIPE 3</div>
+        <div class="version mono">v1.0.0</div>
+    </div>
+</header>
+
+<div class="layout">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+        <div class="sidebar-section-label">BLOCOS</div>
+        <button class="nav-item active" data-tab="ob" onclick="switchTab('ob',this)">
+            <div class="nav-icon ob-icon">OB</div>
+            <div class="nav-text">
+                <div class="nav-name">Organization Blocks</div>
+                <div class="nav-sub">Ciclo de execução</div>
+            </div>
+            <div class="nav-pulse" id="nav-ob-pulse"></div>
+        </button>
+        <button class="nav-item" data-tab="fc" onclick="switchTab('fc',this)">
+            <div class="nav-icon fc-icon">FC</div>
+            <div class="nav-text">
+                <div class="nav-name">Function</div>
+                <div class="nav-sub">Sem memória</div>
+            </div>
+        </button>
+        <button class="nav-item" data-tab="fb" onclick="switchTab('fb',this)">
+            <div class="nav-icon fb-icon">FB</div>
+            <div class="nav-text">
+                <div class="nav-name">Function Block</div>
+                <div class="nav-sub">Com memória</div>
+            </div>
+            <div class="nav-pulse" id="nav-fb-pulse"></div>
+        </button>
+        <button class="nav-item" data-tab="db" onclick="switchTab('db',this)">
+            <div class="nav-icon db-icon">DB</div>
+            <div class="nav-text">
+                <div class="nav-name">Data Blocks</div>
+                <div class="nav-sub">Memória do sistema</div>
+            </div>
+        </button>
+
+        <div class="sidebar-section-label" style="margin-top:24px">CONTROLES</div>
+        <div class="sim-controls">
+            <button class="ctrl-btn run-btn" id="run-btn" onclick="toggleRun()">
+                <span class="ctrl-icon">▶</span> INICIAR
+            </button>
+            <button class="ctrl-btn stop-btn" onclick="stopSim()" id="stop-btn" disabled>
+                <span class="ctrl-icon">■</span> PARAR
+            </button>
+        </div>
+
+        <div class="sidebar-section-label" style="margin-top:24px">DIFF FC × FB</div>
+        <div class="diff-card">
+            <div class="diff-row">
+                <div class="diff-block fc-block">FC<br><span>sem estado</span></div>
+                <div class="diff-block fb-block">FB<br><span>com estado</span></div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+        <!-- ===== OB TAB ===== -->
+        <div id="tab-ob" class="tab-panel active">
+            <div class="panel-header">
+                <div class="panel-title">Organization Blocks — Ciclo de Execução</div>
+                <div class="panel-badge">RUNTIME</div>
+            </div>
+
+            <div class="ob-grid">
+                <div class="ob-card" id="obc-100">
+                    <div class="ob-card-header">
+                        <div class="ob-num">OB100</div>
+                        <div class="ob-badge startup-badge">STARTUP</div>
+                    </div>
+                    <div class="ob-card-title">Inicialização</div>
+                    <div class="ob-card-desc">Executado uma única vez ao ligar o CLP ou sair do modo STOP</div>
+                    <div class="ob-code">
+                        <span class="kw">ORGANIZATION_BLOCK</span> OB100_Startup
+                        <span class="cm">// Zera DBs e estado seguro</span>
+                        DB1.xSistemaHabilitado <span class="op">:=</span> <span class="kw">FALSE</span>;
+                        DB1.xModoManual <span class="op">:=</span> <span class="kw">TRUE</span>;
+                        DB1.iCiclosOB1 <span class="op">:=</span> <span class="num">0</span>;</div>
+                    <div class="ob-indicator">
+                        <div class="ob-led" id="led-ob100"></div>
+                        <span class="ob-exec-label" id="exec-ob100">—</span>
+                    </div>
+                </div>
+
+                <div class="ob-card active-ob" id="obc-1">
+                    <div class="ob-card-header">
+                        <div class="ob-num">OB1</div>
+                        <div class="ob-badge main-badge">MAIN</div>
+                    </div>
+                    <div class="ob-card-title">Programa Principal</div>
+                    <div class="ob-card-desc">Ciclo contínuo de varredura (~10ms). Chama FBs e consolida alarmes</div>
+                    <div class="ob-code">
+                        <span class="kw">ORGANIZATION_BLOCK</span> OB1_Main
+                        <span class="cm">// Ciclo principal</span>
+                        DB1.iCiclosOB1 <span class="op">:=</span> DB1.iCiclosOB1 <span class="op">+</span> <span class="num">1</span>;
+                        FB20_ControleMotor.DB20(...);</div>
+                    <div class="ob-indicator">
+                        <div class="ob-led" id="led-ob1"></div>
+                        <span class="ob-exec-label" id="exec-ob1">—</span>
+                    </div>
+                </div>
+
+                <div class="ob-card" id="obc-30">
+                    <div class="ob-card-header">
+                        <div class="ob-num">OB30</div>
+                        <div class="ob-badge cyclic-badge">500ms</div>
+                    </div>
+                    <div class="ob-card-title">Interrupção Cíclica</div>
+                    <div class="ob-card-desc">Dispara a cada 500ms para leitura de analógicos e chamada da FC</div>
+                    <div class="ob-code">
+                        <span class="kw">ORGANIZATION_BLOCK</span> OB30_CyclicInt
+                        <span class="cm">// A cada 500ms</span>
+                        FC10_Calculo_Temperatura(
+                        rCelsius <span class="op">:=</span> DB1.rPV,
+                        rFahrenheit <span class="op">=></span> DB1.rFahrenheit);</div>
+                    <div class="ob-indicator">
+                        <div class="ob-led" id="led-ob30"></div>
+                        <span class="ob-exec-label" id="exec-ob30">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="log-panel">
+                <div class="log-header">
+                    <div class="log-title">CONSOLE DE EXECUÇÃO</div>
+                    <button class="clear-btn" onclick="clearLog('ob-log')">LIMPAR</button>
+                </div>
+                <div class="log-body" id="ob-log"></div>
+            </div>
+        </div>
+
+        <!-- ===== FC TAB ===== -->
+        <div id="tab-fc" class="tab-panel">
+            <div class="panel-header">
+                <div class="panel-title">FC10 — Conversão de Temperatura</div>
+                <div class="panel-badge fc-badge-tag">SEM MEMÓRIA</div>
+            </div>
+
+            <div class="fc-layout">
+                <div class="code-panel">
+                    <div class="code-header">
+                        <div class="code-filename">FC10_Calculo_Temperatura.scl</div>
+                        <div class="code-lang">SCL</div>
+                    </div>
+                    <div class="code-body">
+                        <div class="code-line"><span class="ln">01</span><span class="kw">FUNCTION</span> <span class="fn">"FC10_Calculo_Temperatura"</span> : <span class="kw">VOID</span></div>
+                        <div class="code-line"><span class="ln">02</span>  TITLE = <span class="str">'FC: Conversão Celsius → Fahrenheit'</span></div>
+                        <div class="code-line"><span class="ln">03</span>  VERSION : <span class="str">'1.0'</span></div>
+                        <div class="code-line ln-empty"><span class="ln">04</span></div>
+                        <div class="code-line"><span class="ln">05</span><span class="kw">VAR_INPUT</span></div>
+                        <div class="code-line highlight-line"><span class="ln">06</span>  rCelsius : <span class="kw">REAL</span>; <span class="cm">// Temperatura de entrada (°C)</span></div>
+                        <div class="code-line"><span class="ln">07</span><span class="kw">END_VAR</span></div>
+                        <div class="code-line ln-empty"><span class="ln">08</span></div>
+                        <div class="code-line"><span class="ln">09</span><span class="kw">VAR_OUTPUT</span></div>
+                        <div class="code-line highlight-line"><span class="ln">10</span>  rFahrenheit : <span class="kw">REAL</span>; <span class="cm">// Temperatura convertida (°F)</span></div>
+                        <div class="code-line"><span class="ln">11</span><span class="kw">END_VAR</span></div>
+                        <div class="code-line ln-empty"><span class="ln">12</span></div>
+                        <div class="code-line"><span class="ln">13</span><span class="cm">// Sem VAR (sem memória interna!)</span></div>
+                        <div class="code-line ln-empty"><span class="ln">14</span></div>
+                        <div class="code-line"><span class="ln">15</span><span class="kw">BEGIN</span></div>
+                        <div class="code-line exec-line"><span class="ln">16</span>  rFahrenheit := (rCelsius <span class="op">*</span> <span class="num">9.0</span> / <span class="num">5.0</span>) <span class="op">+</span> <span class="num">32.0</span>;</div>
+                        <div class="code-line"><span class="ln">17</span><span class="kw">END_FUNCTION</span></div>
+                    </div>
+                </div>
+
+                <div class="fc-controls">
+                    <div class="io-card">
+                        <div class="io-header">ENTRADA</div>
+                        <div class="io-label">rCelsius</div>
+                        <div class="slider-wrap">
+                            <input type="range" min="-40" max="150" value="25" id="celsius-slider" oninput="calcFC(this.value)" class="styled-range">
+                        </div>
+                        <div class="io-value" id="fc-celsius-val">25.0 °C</div>
+                    </div>
+
+                    <div class="arrow-block">
+                        <div class="arrow-line"></div>
+                        <div class="arrow-head">▶</div>
+                        <div class="arrow-formula">F = (C × 9/5) + 32</div>
+                    </div>
+
+                    <div class="io-card output-card">
+                        <div class="io-header">SAÍDA</div>
+                        <div class="io-label">rFahrenheit</div>
+                        <div class="io-big-val" id="fc-fahr-val">77.0</div>
+                        <div class="io-unit">°F</div>
+                    </div>
+
+                    <div class="no-memory-card">
+                        <div class="nm-icon">∅</div>
+                        <div class="nm-text">SEM MEMÓRIA INTERNA<br><span>Resultado recalculado a cada chamada</span></div>
+                    </div>
+
+                    <div class="gauge-wrap">
+                        <div class="gauge-label">ESCALA</div>
+                        <div class="gauge-bar">
+                            <div class="gauge-fill" id="gauge-fill"></div>
+                            <div class="gauge-thumb" id="gauge-thumb"></div>
+                        </div>
+                        <div class="gauge-minmax">
+                            <span>-40°C</span><span>150°C</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FB TAB ===== -->
+        <div id="tab-fb" class="tab-panel">
+            <div class="panel-header">
+                <div class="panel-title">FB20 — Controle de Motor</div>
+                <div class="panel-badge fb-badge-tag">COM MEMÓRIA</div>
+            </div>
+
+            <div class="fb-layout">
+                <!-- Estado e Motor Visual -->
+                <div class="fb-top">
+                    <div class="motor-panel">
+                        <div class="motor-title">MOTOR 1 — BOMBA DE ÁGUA</div>
+                        <div class="motor-visual" id="motor-visual">
+                            <div class="motor-housing" id="motor-housing">
+                                <div class="motor-label" id="motor-label">M</div>
+                                <div class="motor-ring" id="motor-ring"></div>
+                            </div>
+                            <div class="shaft-line" id="shaft-line"></div>
+                            <div class="wheel-group">
+                                <div class="wheel-outer" id="wheel-outer">
+                                    <div class="wheel-spoke" id="wheel-spoke"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="motor-status-row">
+                            <div class="motor-stat">
+                                <div class="mstat-label">CONTATORA</div>
+                                <div class="mstat-val" id="m-contatora">OFF</div>
+                            </div>
+                            <div class="motor-stat">
+                                <div class="mstat-label">ROTAÇÃO</div>
+                                <div class="mstat-val" id="m-rot">OFF</div>
+                            </div>
+                            <div class="motor-stat">
+                                <div class="mstat-label">FALHAS</div>
+                                <div class="mstat-val" id="m-falhas">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="state-panel">
+                        <div class="state-title">MÁQUINA DE ESTADOS — iEstadoInterno (DB20)</div>
+                        <div class="states-row">
+                            <div class="state-node s0 active-state" id="sn0">
+                                <div class="sn-num">0</div>
+                                <div class="sn-name">REPOUSO</div>
+                            </div>
+                            <div class="state-arrow">→</div>
+                            <div class="state-node s1" id="sn1">
+                                <div class="sn-num">1</div>
+                                <div class="sn-name">PARTINDO</div>
+                            </div>
+                            <div class="state-arrow">→</div>
+                            <div class="state-node s2" id="sn2">
+                                <div class="sn-num">2</div>
+                                <div class="sn-name">RODANDO</div>
+                            </div>
+                            <div class="state-arrow">→</div>
+                            <div class="state-node s3" id="sn3">
+                                <div class="sn-num">3</div>
+                                <div class="sn-name">PARANDO</div>
+                            </div>
+                            <div class="state-arrow">→</div>
+                            <div class="state-node s4" id="sn4">
+                                <div class="sn-num">4</div>
+                                <div class="sn-name">FALHA</div>
+                            </div>
+                        </div>
+                        <div class="instance-tag">
+                            Instance DB: <span class="mono">DB20_MotorInstance</span> · iEstadoInterno = <span class="mono" id="state-db-val">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões e Código -->
+                <div class="fb-bottom">
+                    <div class="cmd-panel">
+                        <div class="cmd-title">PAINEL DE COMANDO</div>
+                        <div class="cmd-buttons">
+                            <button class="cmd-btn start-cmd" onclick="fbCmd('partida')">
+                                <div class="cmd-btn-icon">▶</div>
+                                <div class="cmd-btn-label">PARTIDA</div>
+                                <div class="cmd-btn-sub">I0.0</div>
+                            </button>
+                            <button class="cmd-btn stop-cmd" onclick="fbCmd('parada')">
+                                <div class="cmd-btn-icon">■</div>
+                                <div class="cmd-btn-label">PARADA</div>
+                                <div class="cmd-btn-sub">I0.1 NF</div>
+                            </button>
+                            <button class="cmd-btn fault-cmd" onclick="fbCmd('falha')">
+                                <div class="cmd-btn-icon">⚡</div>
+                                <div class="cmd-btn-label">FALHA TÉRMICA</div>
+                                <div class="cmd-btn-sub">I0.2 NF</div>
+                            </button>
+                            <button class="cmd-btn reset-cmd" onclick="fbCmd('reset')">
+                                <div class="cmd-btn-icon">↺</div>
+                                <div class="cmd-btn-label">RESET</div>
+                                <div class="cmd-btn-sub">I0.4</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="fb-code-mini">
+                        <div class="code-header">
+                            <div class="code-filename">FB20_ControleMotor.scl</div>
+                            <div class="code-lang">SCL</div>
+                        </div>
+                        <div class="code-body" style="font-size:11px;line-height:1.5">
+                            <div class="code-line"><span class="ln">01</span><span class="kw">VAR</span> <span class="cm">// STATIC — persiste no DB20</span></div>
+                            <div class="code-line mem-line"><span class="ln">02</span>  iEstadoInterno : <span class="kw">INT</span>; <span class="cm">// ← MEMÓRIA</span></div>
+                            <div class="code-line"><span class="ln">03</span><span class="kw">END_VAR</span></div>
+                            <div class="code-line"><span class="ln">04</span><span class="kw">CASE</span> iEstadoInterno <span class="kw">OF</span></div>
+                            <div class="code-line" id="cline-0"><span class="ln">05</span>  <span class="num">0</span>: <span class="kw">IF</span> xPartida <span class="kw">THEN</span> estado := <span class="num">1</span>; <span class="kw">END_IF</span>;</div>
+                            <div class="code-line" id="cline-1"><span class="ln">06</span>  <span class="num">1</span>: xContatora := <span class="kw">TRUE</span>; <span class="cm">// aguarda sensor</span></div>
+                            <div class="code-line" id="cline-2"><span class="ln">07</span>  <span class="num">2</span>: xContatora := <span class="kw">TRUE</span>; xMotorRodando := <span class="kw">TRUE</span>;</div>
+                            <div class="code-line" id="cline-3"><span class="ln">08</span>  <span class="num">3</span>: xContatora := <span class="kw">FALSE</span>; <span class="cm">// aguarda parada</span></div>
+                            <div class="code-line" id="cline-4"><span class="ln">09</span>  <span class="num">4</span>: <span class="cm">// FALHA — aguarda reset</span></div>
+                            <div class="code-line"><span class="ln">10</span><span class="kw">END_CASE</span>;</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="log-panel">
+                    <div class="log-header">
+                        <div class="log-title">LOG DO FB20</div>
+                        <button class="clear-btn" onclick="clearLog('fb-log')">LIMPAR</button>
+                    </div>
+                    <div class="log-body" id="fb-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== DB TAB ===== -->
+        <div id="tab-db" class="tab-panel">
+            <div class="panel-header">
+                <div class="panel-title">Data Blocks — Memória do Sistema</div>
+                <div class="panel-badge">LIVE</div>
+            </div>
+
+            <div class="db-layout">
+                <div class="db-card">
+                    <div class="db-card-header">
+                        <div class="db-type-badge global-db">GLOBAL DB</div>
+                        <div class="db-name">DB1_GlobalData</div>
+                    </div>
+                    <div class="db-desc">Dados compartilhados entre todos os blocos. Visível ao SCADA/HMI.</div>
+                    <div class="db-table" id="db-global"></div>
+                </div>
+
+                <div class="db-card">
+                    <div class="db-card-header">
+                        <div class="db-type-badge instance-db">INSTANCE DB</div>
+                        <div class="db-name">DB20_MotorInstance</div>
+                    </div>
+                    <div class="db-desc">Memória exclusiva do FB20. Gerado automaticamente. Cada motor tem o seu.</div>
+                    <div class="db-table" id="db-instance"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script src="modules/fc.js"></script>
+<script src="modules/fb.js"></script>
+<script src="modules/ob.js"></script>
+<script src="modules/db.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
