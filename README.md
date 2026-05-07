@@ -1,16 +1,73 @@
-🏭 ProSim: Simulador de Silo Industrial (CLP)Desenvolvido pela Equipe 3 | Projeto Prático de Lógica de Programação de CLPs (IEC 61131-3)Bem-vindo ao ProSim - Silo Simulator, uma aplicação interativa baseada na web projetada para simular o comportamento de um sistema industrial controlado por um Controlador Lógico Programável (CLP). Este projeto une a interface visual de operação (IHM) com a representação em tempo real da lógica de contatos (Diagrama Ladder) e execução de blocos de função.Figura 1: Visão geral da HMI e painel do Diagrama Ladder do simulador.📋 SumárioVisão Geral do ProcessoTabelas de Mapeamento (I/O e Variáveis)Gráficos e Fluxogramas (Máquina de Estados)Arquitetura do CLP simuladoComo Executar⚙️ Visão Geral do ProcessoO simulador emula um processo clássico de enchimento de caixas em uma esteira transportadora:START: O motor é acionado, e a esteira traz uma caixa vazia.PROXIMIDADE: Um sensor detecta a caixa na posição correta sob o silo. A esteira para.ENCHIMENTO: A válvula solenoide abre, despejando o material na caixa.NÍVEL: O sensor de nível monitora a capacidade. Quando cheio, a válvula fecha e o motor reinicia para despachar a caixa.FALHA/STOP: Botões e eventos de segurança interrompem o processo imediatamente.📊 Tabelas de Mapeamento (I/O)Para garantir a organização da programação, todos os dispositivos de campo foram mapeados conforme a planilha de Entradas e Saídas abaixo:Entradas Digitais (Inputs - I:1/xx)TagEndereçoDescriçãoTipoBOTAO_STARTI:1/01Botão pulsador para iniciar o processo.NOBOTAO_STOPI:1/02Botão de parada de emergência/parada de ciclo.NCSENS_PROXI:1/03Sensor de proximidade (Detecta a caixa na posição).NOSENS_NIVELI:1/04Sensor de nível alto no silo.NOSaídas Digitais (Outputs - O:2/xx)TagEndereçoDescriçãoStatus HMIMOTOR_ESTEIRAO:2/00Contatora principal do motor da esteira.Animação / I/OVALV_SOLENOIDEO:2/01Solenoide de abertura do silo.Animação / I/OSINAL_RUNO:2/02Sinaleiro Verde (Máquina operando).Lâmpada VerdeSINAL_FILLO:2/03Sinaleiro Amarelo (Processo de dosagem ativo).Lâmpada AmarelaSINAL_FULLO:2/04Sinaleiro Verde (Capacidade do Silo OK).Lâmpada Verde📈 Gráficos e Fluxogramas (Máquina de Estados)O controle do motor foi modelado utilizando uma Máquina de Estados Finitos, encapsulada no Bloco de Função FB20.Gráfico de Transição de Estados (Statechart)Snippet de códigostateDiagram-v2
+<h1 align="center">🏭 ProSim: Simulador de Silo Industrial</h1>
+
+<p align="center">
+  <i>Projeto Prático de Lógica de Programação de CLPs (IEC 61131-3) desenvolvido pela <b>Equipe 3</b>.</i>
+</p>
+
+---
+
+## 📌 Visão Geral do Projeto
+
+O **ProSim - Silo Simulator** é uma aplicação web interativa que emula o comportamento de um sistema industrial controlado por um Controlador Lógico Programável (CLP). Ele une uma interface visual (IHM) intuitiva com a representação em tempo real do Diagrama Ladder e blocos de função.
+
+O simulador reproduz um processo de envase em esteira:
+1. **START:** Aciona o motor e traz uma caixa vazia.
+2. **PROXIMIDADE:** Um sensor detecta a caixa e para a esteira.
+3. **ENCHIMENTO:** A válvula solenoide abre e despeja o material.
+4. **NÍVEL:** Ao atingir 100%, a válvula fecha e o motor despacha a caixa.
+5. **FALHA/STOP:** Sistemas de intertravamento interrompem o ciclo.
+
+---
+
+## 🔌 Tabela de I/O (Entradas e Saídas)
+
+### Entradas Digitais (`I:1/xx`)
+| Tag | Endereço | Função no Processo | Tipo |
+|---|:---:|---|:---:|
+| **START** | `I:1/01` | Iniciar o ciclo contínuo. | NO (NA) |
+| **STOP** | `I:1/02` | Parar o ciclo / Emergência. | NC (NF) |
+| **PROX** | `I:1/03` | Sensor de presença da caixa. | NO (NA) |
+| **LEVEL** | `I:1/04` | Sensor de nível alto de produto. | NO (NA) |
+
+### Saídas Digitais (`O:2/xx`)
+| Tag | Endereço | Atuador / Indicador | Status IHM |
+|---|:---:|---|:---:|
+| **MOTOR** | `O:2/00` | Motor da esteira transportadora. | Animação Visual |
+| **SOL** | `O:2/01` | Válvula solenóide do silo. | Animação Visual |
+| **RUN** | `O:2/02` | Indicador de máquina operando. | Lâmpada Verde |
+| **FILL** | `O:2/03` | Indicador de dosagem em andamento.| Lâmpada Amarela |
+| **FULL** | `O:2/04` | Indicador de capacidade máxima. | Lâmpada Verde |
+
+---
+
+## 🧠 Arquitetura do CLP e Diagrama Ladder
+
+A simulação é processada localmente em JavaScript utilizando uma arquitetura modular inspirada na norma IEC 61131-3:
+
+- **`OB1 (Main)`**: Controla os *rungs* principais (selo do motor, sinaleiros e condições da solenóide) com um *Scan Time* simulado de 8ms a 11ms.
+- **`OB30 (Interrupt)`**: Disparado a cada 5 ciclos (~500ms) para atualizar variáveis de processo.
+- **`FC10 (Função Matem.)`**: Conversão térmica *Stateless* de °C para °F: `(C × 9/5) + 32`.
+- **`FB20 (Motor Control)`**: Máquina de estados com memória (*Instance DB20*).
+
+---
+
+## 📊 Máquina de Estados (FB20)
+
+O motor é gerenciado por uma máquina de estados internos:
+
+```mermaid
+stateDiagram-v2
     [*] --> 0_REPOUSO
     
     0_REPOUSO --> 1_PARTINDO : Comando START
-    1_PARTINDO --> 2_RODANDO : Delay (Aceleração)
+    1_PARTINDO --> 2_RODANDO : Acelerando
     
-    2_RODANDO --> 3_PARANDO : Comando STOP ou Fim de Ciclo
-    3_PARANDO --> 0_REPOUSO : Delay (Desaceleração)
+    2_RODANDO --> 3_PARANDO : Comando STOP ou Ciclo
+    3_PARANDO --> 0_REPOUSO : Desacelerando
     
-    0_REPOUSO --> 4_FALHA : Alarme Térmico
-    1_PARTINDO --> 4_FALHA : Alarme Térmico
-    2_RODANDO --> 4_FALHA : Alarme Térmico
-    3_PARANDO --> 4_FALHA : Alarme Térmico
+    0_REPOUSO --> 4_FALHA : Alarme
+    1_PARTINDO --> 4_FALHA : Alarme
+    2_RODANDO --> 4_FALHA : Alarme
+    3_PARANDO --> 4_FALHA : Alarme
     
-    4_FALHA --> 0_REPOUSO : Reset (Acknowledge)
-Tabela de Estados Internos (Instance DB20)ID do EstadoNomeCondição do MotorCor do Status (HMI)0REPOUSODesligado (xContatora = False)⚪ Branco / Inativo1PARTINDOEm rampa de aceleração🟡 Amarelo2RODANDOEm velocidade nominal (Rodando = True)🟢 Verde3PARANDOEm rampa de desaceleração🟡 Amarelo4FALHABloqueado térmico (Interlock)🔴 Vermelho🧠 Arquitetura do CLP SimuladoA equipe dividiu a lógica de controle seguindo o padrão modular IEC 61131-3, simulado em JavaScript:OB1 (Main Scan): Rungs principais (000, 001, 002) que controlam o selo do motor, ativação dos sinaleiros e condições de abertura da válvula solenóide. O tempo de ciclo (Scan Time) flutua dinamicamente entre 8ms e 11ms para maior realismo.OB30 (Cyclic Interrupt): Executa chamadas com base em tempo a cada 5 ciclos de varredura (~500ms).FC10 (Função de Cálculo): Um bloco Stateless (sem memória). Converte a temperatura de Setpoint (SP) de Celsius para Fahrenheit utilizando a fórmula matemática: (C × 9/5) + 32.FB20 (Controle de Motor): Bloco com memória (Instance DB). Retém a variável estática iEstadoInterno entre os ciclos de scan, permitindo a lógica sequencial da máquina de estados apresentada no gráfico acima.🚀 Como ExecutarNão há necessidade de instalar compiladores ou softwares pesados (como TIA Portal ou RSLogix).Clone este repositório ou baixe os arquivos fonte.Certifique-se de que todas as três partes (<style>, <html>, e <script>) estão reunidas no arquivo index.html.Dê um duplo clique no arquivo index.html para abri-lo no seu navegador (Google Chrome, Firefox, ou Edge).No painel de COMANDO, clique em ▶ START para iniciar o CLP virtual e observar a animação e o acionamento do Ladder em tempo real!
+    4_FALHA --> 0_REPOUSO : Reset
