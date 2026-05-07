@@ -1,100 +1,73 @@
-# Arquitetura do Projeto CLP — Equipe 3
+<h1 align="center">🏭 ProSim: Simulador de Silo Industrial</h1>
 
-## Diagrama de Chamadas
+<p align="center">
+  <i>Projeto Prático de Lógica de Programação de CLPs (IEC 61131-3) desenvolvido pela <b>Equipe 3</b>.</i>
+</p>
 
-```
-INICIALIZAÇÃO
-└── OB100_Startup
-        └── Inicializa DB1_GlobalData (estado seguro)
+---
 
-CICLO PRINCIPAL (a cada scan ~10ms)
-└── OB1_Main
-        ├── Lê DB1_GlobalData (status do sistema)
-        ├── Chama FB20_ControleMotor (DB20_MotorInstance)
-        │       ├── Máquina de estados interna (STATIC vars)
-        │       ├── Temporizadores TON internos
-        │       └── Escreve saídas digitais (Q0.0, Q0.1, Q0.2)
-        └── Consolida alarmes → DB1_GlobalData
+## 📌 Visão Geral do Projeto
 
-INTERRUPÇÃO CÍCLICA (a cada 500ms)
-└── OB30_CyclicInt
-        ├── Lê entradas analógicas (IW64, IW66)
-        ├── Chama FC10_Calculo (STATELESS)
-        │       ├── Converte ADC → EU
-        │       ├── Calcula erro SP - PV
-        │       └── Aplica ganho Kp + saturação
-        └── Grava resultados em DB1_GlobalData
-```
+O **ProSim - Silo Simulator** é uma aplicação web interativa que emula o comportamento de um sistema industrial controlado por um Controlador Lógico Programável (CLP). Ele une uma interface visual (IHM) intuitiva com a representação em tempo real do Diagrama Ladder e blocos de função.
 
-## Fluxo de Dados
+O simulador reproduz um processo de envase em esteira:
+1. **START:** Aciona o motor e traz uma caixa vazia.
+2. **PROXIMIDADE:** Um sensor detecta a caixa e para a esteira.
+3. **ENCHIMENTO:** A válvula solenoide abre e despeja o material.
+4. **NÍVEL:** Ao atingir 100%, a válvula fecha e o motor despacha a caixa.
+5. **FALHA/STOP:** Sistemas de intertravamento interrompem o ciclo.
 
-```
-[Sensor Temperatura]
-        │ (4-20mA → 0-27648 ADC)
-        ▼
-    IW64 (Entrada Analógica)
-        │
-        ▼
-  OB30 → FC10_Calculo
-        │  ├── rValor_EU (temperatura em °C)
-        │  ├── rErro (SP - PV)
-        │  └── rSaidaControle (0-100%)
-        ▼
-  DB1_GlobalData
-        │  (disponível para OB1, HMI, SCADA)
-        ▼
-  QW80 (Saída Analógica) → [Atuador: válvula/inversor]
+---
 
-[Botão Partida]
-        │ (I0.0)
-        ▼
-  OB1 → FB20_ControleMotor → DB20_MotorInstance (memória)
-        │  ├── Máquina de estados (0-4)
-        │  ├── Timer de partida (tonPartida)
-        │  └── Contador de falhas (iContadorFalhas)
-        ▼
-  Q0.0 (Contatora) / Q0.1 (Falha) / Q0.2 (Rodando)
-```
+## 🔌 Tabela de I/O (Entradas e Saídas)
 
-## Máquina de Estados — FB20
+### Entradas Digitais (`I:1/xx`)
+| Tag | Endereço | Função no Processo | Tipo |
+|---|:---:|---|:---:|
+| **START** | `I:1/01` | Iniciar o ciclo contínuo. | NO (NA) |
+| **STOP** | `I:1/02` | Parar o ciclo / Emergência. | NC (NF) |
+| **PROX** | `I:1/03` | Sensor de presença da caixa. | NO (NA) |
+| **LEVEL** | `I:1/04` | Sensor de nível alto de produto. | NO (NA) |
 
-```
-         xPartida (borda↑)
-  ┌──────────────────────────────┐
-  │    AND NOT xFalhaInterna     │
-  ▼                              │
-[0: REPOUSO] ─────────────────► [1: PARTINDO]
-     ▲                               │
-     │                               ├─ xSensorRotacao=TRUE → [2: RODANDO]
-     │                               ├─ tonPartida.Q (timeout) → [4: FALHA]
-     │                               └─ NOT xParada → [3: PARANDO]
-     │
-     │        NOT xParada
-[2: RODANDO] ──────────────────► [3: PARANDO]
-     │                               │
-     ├─ xFalhaTermica → [4: FALHA]   └─ NOT xSensorRotacao → [0: REPOUSO]
-     └─ xSemRotacao → [4: FALHA]
-                                 [4: FALHA]
-                                     │
-                                     └─ xReset↑ AND tonReengage.Q AND xFalhaTermica
-                                             → [0: REPOUSO]
-```
+### Saídas Digitais (`O:2/xx`)
+| Tag | Endereço | Atuador / Indicador | Status IHM |
+|---|:---:|---|:---:|
+| **MOTOR** | `O:2/00` | Motor da esteira transportadora. | Animação Visual |
+| **SOL** | `O:2/01` | Válvula solenóide do silo. | Animação Visual |
+| **RUN** | `O:2/02` | Indicador de máquina operando. | Lâmpada Verde |
+| **FILL** | `O:2/03` | Indicador de dosagem em andamento.| Lâmpada Amarela |
+| **FULL** | `O:2/04` | Indicador de capacidade máxima. | Lâmpada Verde |
 
-## Convenção de Código
+---
 
-| Prefixo | Tipo          | Exemplo             |
-|---------|---------------|---------------------|
-| `x`     | BOOL          | `xMotorRodando`     |
-| `r`     | REAL          | `rTemperatura_PV`   |
-| `i`     | INT           | `iEstado`           |
-| `di`    | DINT          | `diCiclosOB1`       |
-| `t`     | TIME          | `tTempoPartida`     |
-| `dt`    | DATE_AND_TIME | `dtInicializacao`   |
-| `ton`   | TON timer     | `tonPartida`        |
-| `c`     | CONSTANT      | `cRODANDO`          |
+## 🧠 Arquitetura do CLP e Diagrama Ladder
 
-role de bomba"
+A simulação é processada localmente em JavaScript utilizando uma arquitetura modular inspirada na norma IEC 61131-3:
 
-# Tags de versão para cada release de produção
-git tag -a v1.0.0 -m "Release inicial — 1 motor, 1 loop de temperatura"
-```
+- **`OB1 (Main)`**: Controla os *rungs* principais (selo do motor, sinaleiros e condições da solenóide) com um *Scan Time* simulado de 8ms a 11ms.
+- **`OB30 (Interrupt)`**: Disparado a cada 5 ciclos (~500ms) para atualizar variáveis de processo.
+- **`FC10 (Função Matem.)`**: Conversão térmica *Stateless* de °C para °F: `(C × 9/5) + 32`.
+- **`FB20 (Motor Control)`**: Máquina de estados com memória (*Instance DB20*).
+
+---
+
+## 📊 Máquina de Estados (FB20)
+
+O motor é gerenciado por uma máquina de estados internos:
+
+```mermaid
+stateDiagram-v2
+    [*] --> 0_REPOUSO
+    
+    0_REPOUSO --> 1_PARTINDO : Comando START
+    1_PARTINDO --> 2_RODANDO : Acelerando
+    
+    2_RODANDO --> 3_PARANDO : Comando STOP ou Ciclo
+    3_PARANDO --> 0_REPOUSO : Desacelerando
+    
+    0_REPOUSO --> 4_FALHA : Alarme
+    1_PARTINDO --> 4_FALHA : Alarme
+    2_RODANDO --> 4_FALHA : Alarme
+    3_PARANDO --> 4_FALHA : Alarme
+    
+    4_FALHA --> 0_REPOUSO : Reset
