@@ -1,100 +1,16 @@
-# Arquitetura do Projeto CLP — Equipe 3
-
-## Diagrama de Chamadas
-
-```
-INICIALIZAÇÃO
-└── OB100_Startup
-        └── Inicializa DB1_GlobalData (estado seguro)
-
-CICLO PRINCIPAL (a cada scan ~10ms)
-└── OB1_Main
-        ├── Lê DB1_GlobalData (status do sistema)
-        ├── Chama FB20_ControleMotor (DB20_MotorInstance)
-        │       ├── Máquina de estados interna (STATIC vars)
-        │       ├── Temporizadores TON internos
-        │       └── Escreve saídas digitais (Q0.0, Q0.1, Q0.2)
-        └── Consolida alarmes → DB1_GlobalData
-
-INTERRUPÇÃO CÍCLICA (a cada 500ms)
-└── OB30_CyclicInt
-        ├── Lê entradas analógicas (IW64, IW66)
-        ├── Chama FC10_Calculo (STATELESS)
-        │       ├── Converte ADC → EU
-        │       ├── Calcula erro SP - PV
-        │       └── Aplica ganho Kp + saturação
-        └── Grava resultados em DB1_GlobalData
-```
-
-## Fluxo de Dados
-
-```
-[Sensor Temperatura]
-        │ (4-20mA → 0-27648 ADC)
-        ▼
-    IW64 (Entrada Analógica)
-        │
-        ▼
-  OB30 → FC10_Calculo
-        │  ├── rValor_EU (temperatura em °C)
-        │  ├── rErro (SP - PV)
-        │  └── rSaidaControle (0-100%)
-        ▼
-  DB1_GlobalData
-        │  (disponível para OB1, HMI, SCADA)
-        ▼
-  QW80 (Saída Analógica) → [Atuador: válvula/inversor]
-
-[Botão Partida]
-        │ (I0.0)
-        ▼
-  OB1 → FB20_ControleMotor → DB20_MotorInstance (memória)
-        │  ├── Máquina de estados (0-4)
-        │  ├── Timer de partida (tonPartida)
-        │  └── Contador de falhas (iContadorFalhas)
-        ▼
-  Q0.0 (Contatora) / Q0.1 (Falha) / Q0.2 (Rodando)
-```
-
-## Máquina de Estados — FB20
-
-```
-         xPartida (borda↑)
-  ┌──────────────────────────────┐
-  │    AND NOT xFalhaInterna     │
-  ▼                              │
-[0: REPOUSO] ─────────────────► [1: PARTINDO]
-     ▲                               │
-     │                               ├─ xSensorRotacao=TRUE → [2: RODANDO]
-     │                               ├─ tonPartida.Q (timeout) → [4: FALHA]
-     │                               └─ NOT xParada → [3: PARANDO]
-     │
-     │        NOT xParada
-[2: RODANDO] ──────────────────► [3: PARANDO]
-     │                               │
-     ├─ xFalhaTermica → [4: FALHA]   └─ NOT xSensorRotacao → [0: REPOUSO]
-     └─ xSemRotacao → [4: FALHA]
-                                 [4: FALHA]
-                                     │
-                                     └─ xReset↑ AND tonReengage.Q AND xFalhaTermica
-                                             → [0: REPOUSO]
-```
-
-## Convenção de Código
-
-| Prefixo | Tipo          | Exemplo             |
-|---------|---------------|---------------------|
-| `x`     | BOOL          | `xMotorRodando`     |
-| `r`     | REAL          | `rTemperatura_PV`   |
-| `i`     | INT           | `iEstado`           |
-| `di`    | DINT          | `diCiclosOB1`       |
-| `t`     | TIME          | `tTempoPartida`     |
-| `dt`    | DATE_AND_TIME | `dtInicializacao`   |
-| `ton`   | TON timer     | `tonPartida`        |
-| `c`     | CONSTANT      | `cRODANDO`          |
-
-role de bomba"
-
-# Tags de versão para cada release de produção
-git tag -a v1.0.0 -m "Release inicial — 1 motor, 1 loop de temperatura"
-```
+🏭 ProSim: Simulador de Silo Industrial (CLP)Desenvolvido pela Equipe 3 | Projeto Prático de Lógica de Programação de CLPs (IEC 61131-3)Bem-vindo ao ProSim - Silo Simulator, uma aplicação interativa baseada na web projetada para simular o comportamento de um sistema industrial controlado por um Controlador Lógico Programável (CLP). Este projeto une a interface visual de operação (IHM) com a representação em tempo real da lógica de contatos (Diagrama Ladder) e execução de blocos de função.Figura 1: Visão geral da HMI e painel do Diagrama Ladder do simulador.📋 SumárioVisão Geral do ProcessoTabelas de Mapeamento (I/O e Variáveis)Gráficos e Fluxogramas (Máquina de Estados)Arquitetura do CLP simuladoComo Executar⚙️ Visão Geral do ProcessoO simulador emula um processo clássico de enchimento de caixas em uma esteira transportadora:START: O motor é acionado, e a esteira traz uma caixa vazia.PROXIMIDADE: Um sensor detecta a caixa na posição correta sob o silo. A esteira para.ENCHIMENTO: A válvula solenoide abre, despejando o material na caixa.NÍVEL: O sensor de nível monitora a capacidade. Quando cheio, a válvula fecha e o motor reinicia para despachar a caixa.FALHA/STOP: Botões e eventos de segurança interrompem o processo imediatamente.📊 Tabelas de Mapeamento (I/O)Para garantir a organização da programação, todos os dispositivos de campo foram mapeados conforme a planilha de Entradas e Saídas abaixo:Entradas Digitais (Inputs - I:1/xx)TagEndereçoDescriçãoTipoBOTAO_STARTI:1/01Botão pulsador para iniciar o processo.NOBOTAO_STOPI:1/02Botão de parada de emergência/parada de ciclo.NCSENS_PROXI:1/03Sensor de proximidade (Detecta a caixa na posição).NOSENS_NIVELI:1/04Sensor de nível alto no silo.NOSaídas Digitais (Outputs - O:2/xx)TagEndereçoDescriçãoStatus HMIMOTOR_ESTEIRAO:2/00Contatora principal do motor da esteira.Animação / I/OVALV_SOLENOIDEO:2/01Solenoide de abertura do silo.Animação / I/OSINAL_RUNO:2/02Sinaleiro Verde (Máquina operando).Lâmpada VerdeSINAL_FILLO:2/03Sinaleiro Amarelo (Processo de dosagem ativo).Lâmpada AmarelaSINAL_FULLO:2/04Sinaleiro Verde (Capacidade do Silo OK).Lâmpada Verde📈 Gráficos e Fluxogramas (Máquina de Estados)O controle do motor foi modelado utilizando uma Máquina de Estados Finitos, encapsulada no Bloco de Função FB20.Gráfico de Transição de Estados (Statechart)Snippet de códigostateDiagram-v2
+    [*] --> 0_REPOUSO
+    
+    0_REPOUSO --> 1_PARTINDO : Comando START
+    1_PARTINDO --> 2_RODANDO : Delay (Aceleração)
+    
+    2_RODANDO --> 3_PARANDO : Comando STOP ou Fim de Ciclo
+    3_PARANDO --> 0_REPOUSO : Delay (Desaceleração)
+    
+    0_REPOUSO --> 4_FALHA : Alarme Térmico
+    1_PARTINDO --> 4_FALHA : Alarme Térmico
+    2_RODANDO --> 4_FALHA : Alarme Térmico
+    3_PARANDO --> 4_FALHA : Alarme Térmico
+    
+    4_FALHA --> 0_REPOUSO : Reset (Acknowledge)
+Tabela de Estados Internos (Instance DB20)ID do EstadoNomeCondição do MotorCor do Status (HMI)0REPOUSODesligado (xContatora = False)⚪ Branco / Inativo1PARTINDOEm rampa de aceleração🟡 Amarelo2RODANDOEm velocidade nominal (Rodando = True)🟢 Verde3PARANDOEm rampa de desaceleração🟡 Amarelo4FALHABloqueado térmico (Interlock)🔴 Vermelho🧠 Arquitetura do CLP SimuladoA equipe dividiu a lógica de controle seguindo o padrão modular IEC 61131-3, simulado em JavaScript:OB1 (Main Scan): Rungs principais (000, 001, 002) que controlam o selo do motor, ativação dos sinaleiros e condições de abertura da válvula solenóide. O tempo de ciclo (Scan Time) flutua dinamicamente entre 8ms e 11ms para maior realismo.OB30 (Cyclic Interrupt): Executa chamadas com base em tempo a cada 5 ciclos de varredura (~500ms).FC10 (Função de Cálculo): Um bloco Stateless (sem memória). Converte a temperatura de Setpoint (SP) de Celsius para Fahrenheit utilizando a fórmula matemática: (C × 9/5) + 32.FB20 (Controle de Motor): Bloco com memória (Instance DB). Retém a variável estática iEstadoInterno entre os ciclos de scan, permitindo a lógica sequencial da máquina de estados apresentada no gráfico acima.🚀 Como ExecutarNão há necessidade de instalar compiladores ou softwares pesados (como TIA Portal ou RSLogix).Clone este repositório ou baixe os arquivos fonte.Certifique-se de que todas as três partes (<style>, <html>, e <script>) estão reunidas no arquivo index.html.Dê um duplo clique no arquivo index.html para abri-lo no seu navegador (Google Chrome, Firefox, ou Edge).No painel de COMANDO, clique em ▶ START para iniciar o CLP virtual e observar a animação e o acionamento do Ladder em tempo real!
