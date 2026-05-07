@@ -3,434 +3,1676 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CLP Simulator — Equipe 3</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <title>TIA Portal Simulator — Equipe 3</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ================================================================
+           RESET & BASE
+        ================================================================ */
+        *{box-sizing:border-box;margin:0;padding:0}
+        :root{
+          --win-bg:#c0c0c0;
+          --win-border-light:#ffffff;
+          --win-border-dark:#808080;
+          --win-border-darker:#404040;
+          --win-title:#000080;
+          --win-title-text:#fff;
+          --panel-bg:#d4d0c8;
+          --panel-in:#a0a097;
+          --inset-light:#fff;
+          --inset-dark:#808080;
+          --green:#00c800;
+          --green2:#008000;
+          --red:#ff2020;
+          --amber:#ffaa00;
+          --blue:#0000ff;
+          --dark-blue:#000080;
+          --yellow-hl:#ffff00;
+          --hmi-bg:#1a1a2e;
+          --hmi-grid:#16213e;
+          --hmi-accent:#0f3460;
+          --hmi-pipe:#8b7355;
+          --hmi-pipe2:#6b5335;
+          --conveyor:#cc2222;
+          --steel:#9aa0a6;
+          --steel2:#6c7278;
+          --mono:'Share Tech Mono',monospace;
+          --raj:'Rajdhani',sans-serif;
+        }
+
+        body{
+          font-family:var(--raj);
+          background:#2a2a2a;
+          color:#000;
+          user-select:none;
+          overflow:hidden;
+          height:100vh;
+        }
+
+        /* ================================================================
+           WINDOW CHROME (Win98 style)
+        ================================================================ */
+        .app-window{
+          width:100vw;
+          height:100vh;
+          display:flex;
+          flex-direction:column;
+          background:var(--panel-bg);
+          border:2px solid;
+          border-color:var(--win-border-light) var(--win-border-darker) var(--win-border-darker) var(--win-border-light);
+        }
+
+        .title-bar{
+          height:22px;
+          background:linear-gradient(90deg,var(--dark-blue),#1084d0);
+          display:flex;
+          align-items:center;
+          padding:0 4px;
+          gap:6px;
+          flex-shrink:0;
+        }
+        .title-icon{width:14px;height:14px;background:var(--amber);border:1px solid #000;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:bold;color:#000}
+        .title-text{flex:1;color:#fff;font-size:11px;font-weight:bold;font-family:var(--mono);letter-spacing:.5px}
+        .title-btns{display:flex;gap:2px}
+        .title-btn{
+          width:16px;height:14px;
+          background:var(--panel-bg);
+          border:1px solid;
+          border-color:var(--win-border-light) var(--win-border-dark) var(--win-border-dark) var(--win-border-light);
+          font-size:9px;font-weight:bold;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;
+          color:#000;
+        }
+        .title-btn.close{background:#c0392b;color:#fff}
+
+        /* Menu bar */
+        .menu-bar{
+          height:20px;
+          background:var(--panel-bg);
+          border-bottom:1px solid var(--win-border-dark);
+          display:flex;
+          align-items:center;
+          padding:0 4px;
+          gap:2px;
+          flex-shrink:0;
+        }
+        .menu-item{
+          padding:2px 8px;
+          font-size:11px;
+          cursor:pointer;
+          color:#000;
+        }
+        .menu-item:hover{background:var(--dark-blue);color:#fff}
+
+        /* Toolbar */
+        .toolbar{
+          height:32px;
+          background:var(--panel-bg);
+          border-bottom:1px solid var(--win-border-dark);
+          display:flex;
+          align-items:center;
+          padding:0 6px;
+          gap:4px;
+          flex-shrink:0;
+        }
+        .tb-group{display:flex;gap:2px;border-right:1px solid var(--win-border-dark);padding-right:6px;margin-right:2px}
+        .tb-btn{
+          height:24px;min-width:24px;
+          background:var(--panel-bg);
+          border:1px solid;
+          border-color:var(--win-border-light) var(--win-border-dark) var(--win-border-dark) var(--win-border-light);
+          cursor:pointer;
+          font-size:10px;font-family:var(--mono);
+          padding:0 6px;
+          display:flex;align-items:center;gap:4px;
+          color:#000;
+          transition:all .05s;
+        }
+        .tb-btn:active{border-color:var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark)}
+        .tb-btn.active{border-color:var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark);background:#b0b0a8}
+        .tb-led{width:10px;height:10px;border-radius:50%;border:1px solid #555}
+        .tb-led.green{background:var(--green);box-shadow:0 0 4px var(--green)}
+        .tb-led.red{background:var(--red);box-shadow:0 0 4px var(--red)}
+        .tb-led.off{background:#333}
+        .tb-sep{width:1px;height:20px;background:var(--win-border-dark);margin:0 4px}
+        .tb-label{font-size:10px;font-family:var(--mono);color:#000}
+        .tb-badge{
+          background:var(--dark-blue);color:#fff;
+          font-size:9px;font-family:var(--mono);
+          padding:1px 6px;border:1px solid #000;
+          letter-spacing:.5px;
+        }
+        .tb-scan{
+          font-family:var(--mono);font-size:10px;color:#000;
+          background:#fff;border:1px inset #888;
+          padding:1px 6px;min-width:40px;text-align:center;
+        }
+
+        /* ================================================================
+           MAIN AREA
+        ================================================================ */
+        .main-area{
+          flex:1;
+          display:flex;
+          overflow:hidden;
+          gap:2px;
+          padding:2px;
+        }
+
+        /* ================================================================
+           HMI PANEL (left)
+        ================================================================ */
+        .hmi-panel{
+          width:420px;
+          flex-shrink:0;
+          display:flex;
+          flex-direction:column;
+          gap:2px;
+        }
+
+        .hmi-window{
+          flex:1;
+          border:2px solid;
+          border-color:var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark);
+          display:flex;
+          flex-direction:column;
+          overflow:hidden;
+        }
+        .sub-title{
+          height:18px;
+          background:linear-gradient(90deg,var(--dark-blue),#1084d0);
+          color:#fff;font-size:10px;font-family:var(--mono);
+          display:flex;align-items:center;padding:0 6px;
+          flex-shrink:0;
+        }
+
+        /* HMI Process Canvas */
+        .hmi-canvas{
+          flex:1;
+          background:var(--hmi-bg);
+          position:relative;
+          overflow:hidden;
+        }
+
+        /* ---- PROCESS ELEMENTS ---- */
+
+        /* Silo/Hopper */
+        .silo{
+          position:absolute;
+          top:8px;left:120px;
+          width:90px;
+        }
+        .silo-body{
+          width:90px;height:80px;
+          background:linear-gradient(90deg,#6b7280,#9aa0a6,#6b7280);
+          border:2px solid #444;
+          border-bottom:none;
+          position:relative;
+        }
+        .silo-body::after{
+          content:'SILO';
+          position:absolute;top:50%;left:50%;
+          transform:translate(-50%,-50%);
+          font-family:var(--mono);font-size:9px;color:#2a2a2a;font-weight:bold;
+        }
+        .silo-hopper{
+          width:0;height:0;
+          border-left:45px solid transparent;
+          border-right:45px solid transparent;
+          border-top:30px solid #7a8290;
+        }
+        .silo-outlet{
+          width:16px;height:16px;
+          background:#555;
+          margin:0 auto;
+          border:1px solid #333;
+        }
+        /* Material in silo */
+        .silo-material{
+          position:absolute;
+          bottom:0;left:0;right:0;
+          background:linear-gradient(180deg,#8B6914,#C4922A);
+          transition:height .5s ease;
+          opacity:.85;
+        }
+
+        /* Solenoid valve */
+        .valve-group{
+          position:absolute;
+          top:136px;left:192px;
+        }
+        .valve-body{
+          width:20px;height:28px;
+          background:linear-gradient(90deg,#4a9eff,#2266cc);
+          border:1px solid #1a4499;
+          border-radius:3px;
+          position:relative;
+        }
+        .valve-body.open{background:linear-gradient(90deg,#00c840,#008020);}
+        .valve-label{font-family:var(--mono);font-size:7px;color:#fff;text-align:center;line-height:1.2;padding-top:6px}
+        .valve-arrow{
+          position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+          width:0;height:0;
+          border-left:5px solid transparent;
+          border-right:5px solid transparent;
+          border-top:8px solid #2266cc;
+          transition:border-top-color .2s;
+        }
+        .valve-body.open .valve-arrow{border-top-color:#008020}
+
+        /* Conveyor belt */
+        .conveyor-wrap{
+          position:absolute;
+          bottom:54px;left:10px;right:10px;
+          height:40px;
+        }
+        .conveyor-track{
+          height:14px;
+          background:var(--conveyor);
+          border:2px solid #991a1a;
+          border-radius:7px;
+          position:relative;
+          overflow:hidden;
+        }
+        .conveyor-stripes{
+          position:absolute;inset:0;
+          background:repeating-linear-gradient(
+            90deg,
+            transparent 0px,transparent 16px,
+            rgba(0,0,0,.25) 16px,rgba(0,0,0,.25) 20px
+          );
+          animation:conveyorMove 0.4s linear infinite;
+          display:none;
+        }
+        .conveyor-stripes.running{display:block}
+        @keyframes conveyorMove{from{background-position:0}to{background-position:-20px}}
+        .conveyor-roller{
+          position:absolute;
+          width:14px;height:14px;
+          background:radial-gradient(circle,#aaa 30%,#666);
+          border-radius:50%;
+          border:1px solid #444;
+          top:0;
+        }
+        .cr-left{left:-1px}
+        .cr-right{right:-1px}
+
+        /* Conveyor rollers row */
+        .roller-row{
+          display:flex;
+          justify-content:space-between;
+          padding:0 2px;
+          margin-top:2px;
+        }
+        .small-roller{
+          width:10px;height:10px;
+          background:radial-gradient(circle,#999,#555);
+          border-radius:50%;
+          border:1px solid #333;
+        }
+
+        /* Motor */
+        .motor-wrap{
+          position:absolute;
+          bottom:20px;right:30px;
+        }
+        .motor-body-svg{
+          width:56px;height:44px;
+          background:linear-gradient(135deg,#1a6eb5,#0a4a85);
+          border:2px solid #0a3060;
+          border-radius:6px 12px 12px 6px;
+          position:relative;
+          display:flex;align-items:center;justify-content:center;
+        }
+        .motor-body-svg::before{
+          content:'M';
+          color:#fff;font-weight:bold;font-size:18px;font-family:var(--raj);
+        }
+        .motor-shaft{
+          position:absolute;
+          right:-16px;top:50%;transform:translateY(-50%);
+          width:16px;height:6px;
+          background:linear-gradient(90deg,#ccc,#888);
+          border-radius:0 2px 2px 0;
+        }
+        .motor-fan{
+          position:absolute;
+          right:-28px;top:50%;transform:translateY(-50%);
+          width:24px;height:24px;
+          border-radius:50%;
+          border:2px solid #666;
+          background:rgba(0,0,0,.3);
+          display:flex;align-items:center;justify-content:center;
+        }
+        .motor-fan::before{
+          content:'✕';
+          font-size:10px;color:#888;
+          transition:transform .1s;
+        }
+        .motor-fan.spinning::before{
+          animation:spinFan .2s linear infinite;
+        }
+        @keyframes spinFan{to{transform:rotate(360deg)}}
+        .motor-label-tag{
+          position:absolute;bottom:-14px;left:0;right:0;
+          font-family:var(--mono);font-size:8px;color:#88aadd;text-align:center;
+        }
+
+        /* Level sensor */
+        .level-sensor{
+          position:absolute;
+          right:60px;top:30px;
+          display:flex;flex-direction:column;align-items:center;gap:2px;
+        }
+        .sensor-body{
+          width:16px;height:50px;
+          background:linear-gradient(90deg,#bbb,#888);
+          border:1px solid #555;
+          border-radius:3px;
+          position:relative;
+          overflow:hidden;
+        }
+        .sensor-fill{
+          position:absolute;bottom:0;left:0;right:0;
+          background:linear-gradient(180deg,#4af,#08f);
+          transition:height .5s;
+        }
+        .sensor-label{font-family:var(--mono);font-size:7px;color:#88aaff;text-align:center}
+
+        /* Prox sensor on conveyor */
+        .prox-sensor{
+          position:absolute;
+          bottom:64px;left:80px;
+          display:flex;flex-direction:column;align-items:center;
+        }
+        .prox-body{
+          width:16px;height:20px;
+          background:linear-gradient(90deg,#c8a000,#a07800);
+          border:1px solid #706000;
+          border-radius:2px;
+          display:flex;align-items:center;justify-content:center;
+        }
+        .prox-led{width:6px;height:6px;border-radius:50%;background:#333;border:1px solid #555}
+        .prox-led.on{background:#ff4400;box-shadow:0 0 4px #ff4400}
+        .prox-label{font-family:var(--mono);font-size:7px;color:#ffcc44}
+
+        /* Product box on conveyor */
+        .product-box{
+          position:absolute;
+          bottom:70px;
+          width:28px;height:28px;
+          background:linear-gradient(135deg,#c8a050,#a07830);
+          border:2px solid #806020;
+          border-radius:2px;
+          display:flex;align-items:center;justify-content:center;
+          font-family:var(--mono);font-size:7px;color:#fff;
+          transition:left .05s linear;
+          display:none;
+        }
+
+        /* Status panel top-right of HMI */
+        .hmi-status{
+          position:absolute;
+          top:8px;right:8px;
+          background:rgba(0,0,0,.7);
+          border:1px solid #334;
+          border-radius:4px;
+          padding:6px 10px;
+          display:flex;flex-direction:column;gap:4px;
+          min-width:120px;
+        }
+        .hmi-title-tag{
+          font-family:var(--mono);font-size:8px;color:#88aaff;
+          border-bottom:1px solid #334;padding-bottom:3px;margin-bottom:2px;
+          text-align:center;letter-spacing:1px;
+        }
+        .hmi-row{display:flex;align-items:center;gap:6px}
+        .hmi-ind{
+          width:12px;height:12px;border-radius:50%;
+          border:1px solid #444;
+          flex-shrink:0;
+          transition:all .2s;
+        }
+        .ind-green{background:#003300}
+        .ind-green.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+        .ind-yellow{background:#332200}
+        .ind-yellow.on{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+        .ind-red{background:#330000}
+        .ind-red.on{background:var(--red);box-shadow:0 0 6px var(--red)}
+        .hmi-ind-label{font-family:var(--mono);font-size:8px;color:#aac;}
+
+        /* Pipe lines */
+        .pipe{
+          position:absolute;
+          background:linear-gradient(90deg,#5a4a3a,#8b7355,#5a4a3a);
+          border:1px solid #3a2a1a;
+        }
+        .pipe-v{width:8px}
+        .pipe-h{height:8px}
+        .pipe-flow{
+          overflow:hidden;
+        }
+        .pipe-flow::after{
+          content:'';
+          position:absolute;inset:0;
+          background:repeating-linear-gradient(
+            0deg,
+            transparent 0px,transparent 4px,
+            rgba(200,160,80,.4) 4px,rgba(200,160,80,.4) 6px
+          );
+          animation:pipeFlow .3s linear infinite;
+          display:none;
+        }
+        .pipe-flow.flowing::after{display:block}
+        @keyframes pipeFlow{from{background-position:0}to{background-position:-10px}}
+
+        /* I/O panels on HMI */
+        .io-panel{
+          position:absolute;
+          right:8px;bottom:10px;
+          background:rgba(0,0,0,.75);
+          border:1px solid #334;
+          border-radius:3px;
+          padding:5px 8px;
+          font-family:var(--mono);font-size:8px;
+          display:flex;flex-direction:column;gap:3px;
+        }
+        .io-row{display:flex;justify-content:space-between;gap:10px;color:#7a9aaa}
+        .io-val{color:#fff}
+        .io-val.active{color:#00ff88}
+
+        /* ================================================================
+           CONTROL PANEL (below HMI)
+        ================================================================ */
+        .ctrl-panel{
+          height:110px;
+          border:2px solid;
+          border-color:var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark);
+          display:flex;
+          overflow:hidden;
+          flex-shrink:0;
+        }
+        .ctrl-section{
+          border-right:2px solid;
+          border-color:var(--win-border-dark);
+          padding:6px 10px;
+          display:flex;flex-direction:column;gap:6px;
+        }
+        .ctrl-title{font-size:9px;font-family:var(--mono);color:#444;letter-spacing:1px;border-bottom:1px solid #aaa;padding-bottom:2px;margin-bottom:2px}
+
+        /* Toggle switches */
+        .toggle-row{display:flex;align-items:center;gap:6px}
+        .toggle-lamp{
+          width:22px;height:22px;border-radius:50%;
+          border:3px solid #555;
+          background:#111;cursor:pointer;
+          box-shadow:inset 0 2px 4px rgba(0,0,0,.5);
+          transition:all .15s;
+          flex-shrink:0;
+        }
+        .toggle-lamp.on-green{background:var(--green);border-color:#006600;box-shadow:0 0 8px var(--green),inset 0 1px 2px rgba(255,255,255,.3)}
+        .toggle-lamp.on-yellow{background:var(--amber);border-color:#886600;box-shadow:0 0 8px var(--amber)}
+        .toggle-lamp.on-red{background:var(--red);border-color:#880000;box-shadow:0 0 8px var(--red)}
+        .toggle-label{font-size:10px;font-family:var(--mono);color:#333;min-width:40px}
+
+        /* Push buttons */
+        .push-btn{
+          height:28px;min-width:52px;
+          border:3px solid;
+          border-color:#fff #555 #555 #fff;
+          border-radius:4px;
+          font-family:var(--mono);font-size:10px;font-weight:bold;
+          cursor:pointer;
+          display:flex;align-items:center;justify-content:center;
+          letter-spacing:.5px;
+          transition:all .08s;
+          flex-shrink:0;
+        }
+        .push-btn:active{border-color:#555 #fff #fff #555;transform:translateY(1px)}
+        .btn-start{background:#00aa00;color:#fff;border-color:#00ff00 #006600 #006600 #00ff00}
+        .btn-start:active{background:#007700}
+        .btn-stop{background:#cc0000;color:#fff;border-color:#ff4444 #880000 #880000 #ff4444}
+        .btn-stop:active{background:#880000}
+        .btn-run{background:var(--dark-blue);color:#fff;border-color:#4477ff #000033 #000033 #4477ff}
+
+        /* ================================================================
+           LADDER PANEL (right)
+        ================================================================ */
+        .ladder-panel{
+          flex:1;
+          display:flex;
+          flex-direction:column;
+          border:2px solid;
+          border-color:var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark);
+          overflow:hidden;
+        }
+        .ladder-body{
+          flex:1;
+          background:#f5f5f0;
+          overflow-y:auto;
+          overflow-x:hidden;
+          padding:4px;
+          font-family:var(--mono);
+          font-size:11px;
+        }
+
+        /* Ladder rung */
+        .rung{
+          display:flex;
+          align-items:center;
+          margin-bottom:4px;
+          position:relative;
+          min-height:48px;
+        }
+        .rung-num{
+          width:28px;flex-shrink:0;
+          font-size:10px;color:#888;
+          text-align:right;padding-right:4px;
+          font-family:var(--mono);
+        }
+        .rung-line{
+          position:relative;
+          flex:1;
+          height:48px;
+          display:flex;align-items:center;
+        }
+        /* Power rail */
+        .power-rail-l{
+          width:6px;height:48px;
+          background:linear-gradient(90deg,#666,#999,#666);
+          flex-shrink:0;
+        }
+        .power-rail-r{
+          width:6px;height:48px;
+          background:linear-gradient(90deg,#666,#999,#666);
+          flex-shrink:0;
+        }
+        /* Horizontal wire */
+        .h-wire{
+          height:2px;
+          background:#888;
+          flex:1;
+          position:relative;
+        }
+        .h-wire.energized{background:var(--yellow-hl)}
+
+        /* Contact (NO) */
+        .contact{
+          width:40px;height:32px;
+          flex-shrink:0;
+          position:relative;
+          display:flex;flex-direction:column;align-items:center;
+          cursor:default;
+        }
+        .contact-name{
+          font-size:8px;color:#333;text-align:center;
+          position:absolute;top:0;left:0;right:0;
+          white-space:nowrap;overflow:hidden;
+          font-family:var(--mono);
+        }
+        .contact-body{
+          width:100%;height:22px;
+          margin-top:10px;
+          position:relative;
+          display:flex;align-items:center;
+        }
+        .contact-line-l{width:10px;height:2px;background:#888}
+        .contact-line-r{width:10px;height:2px;background:#888}
+        .contact-poles{
+          flex:1;
+          display:flex;justify-content:space-around;
+          align-items:flex-end;
+          height:100%;
+          padding-bottom:2px;
+        }
+        .contact-pole{
+          width:2px;height:18px;
+          background:#888;
+          border-radius:1px;
+        }
+        .contact.energized .contact-line-l,
+        .contact.energized .contact-line-r,
+        .contact.energized .contact-pole{background:var(--yellow-hl)}
+        .contact.energized .contact-name{color:#000;font-weight:bold}
+
+        /* Contact NC (with slash) */
+        .contact-nc .contact-poles::after{
+          content:'';
+          position:absolute;
+          width:18px;height:2px;
+          background:#888;
+          transform:rotate(-45deg);
+          top:50%;left:50%;
+          transform-origin:center;
+          transform:translateX(-50%) translateY(-50%) rotate(-45deg);
+        }
+        .contact-nc.energized .contact-poles::after{background:var(--yellow-hl)}
+
+        /* Coil (output) */
+        .coil{
+          width:40px;height:32px;
+          flex-shrink:0;
+          position:relative;
+          display:flex;flex-direction:column;align-items:center;
+        }
+        .coil-name{
+          font-size:8px;color:#333;text-align:center;
+          position:absolute;top:0;left:0;right:0;
+          white-space:nowrap;font-family:var(--mono);
+        }
+        .coil-body{
+          width:100%;height:22px;
+          margin-top:10px;
+          display:flex;align-items:center;
+        }
+        .coil-line-l{width:6px;height:2px;background:#888}
+        .coil-line-r{width:6px;height:2px;background:#888}
+        .coil-circle{
+          flex:1;height:20px;
+          border:2px solid #888;
+          border-radius:50%;
+          background:#fff;
+        }
+        .coil.energized .coil-line-l,.coil.energized .coil-line-r{background:var(--yellow-hl)}
+        .coil.energized .coil-circle{border-color:var(--yellow-hl);background:#ffffcc}
+
+        /* Branch (parallel) */
+        .branch-wrap{
+          flex:1;
+          display:flex;
+          flex-direction:column;
+          position:relative;
+        }
+        .branch-row{display:flex;align-items:center}
+        .branch-v{
+          width:2px;
+          background:#888;
+          align-self:stretch;
+        }
+        .branch-v.energized{background:var(--yellow-hl)}
+
+        /* Timer/Counter block */
+        .func-block{
+          width:64px;
+          border:2px solid #666;
+          background:#e8e8e0;
+          flex-shrink:0;
+          font-family:var(--mono);
+          font-size:8px;
+        }
+        .fb-head{background:#336;color:#fff;text-align:center;padding:1px 2px;font-weight:bold}
+        .fb-row{display:flex;justify-content:space-between;padding:1px 3px;border-top:1px solid #aaa}
+        .fb-row span:last-child{color:#333}
+        .func-block.energized{border-color:var(--yellow-hl)}
+        .func-block.energized .fb-head{background:#aa8800}
+
+        /* Tabs at bottom */
+        .ladder-tabs{
+          height:20px;
+          background:var(--panel-bg);
+          border-top:1px solid var(--win-border-dark);
+          display:flex;
+          align-items:flex-end;
+          padding:0 4px;
+          gap:2px;
+          flex-shrink:0;
+        }
+        .ladder-tab{
+          height:18px;
+          padding:0 8px;
+          font-family:var(--mono);font-size:10px;
+          border:1px solid var(--win-border-dark);
+          border-bottom:none;
+          background:var(--panel-bg);
+          cursor:pointer;
+          display:flex;align-items:center;
+          color:#444;
+        }
+        .ladder-tab.active{background:#f5f5f0;font-weight:bold;color:#000}
+
+        /* Status bar */
+        .status-bar-bottom{
+          height:18px;
+          background:var(--panel-bg);
+          border-top:2px solid;
+          border-color:var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark);
+          display:flex;
+          align-items:center;
+          padding:0 6px;
+          gap:8px;
+          font-size:10px;
+          font-family:var(--mono);
+          flex-shrink:0;
+        }
+        .sb-item{
+          padding:0 6px;
+          border-right:1px solid var(--win-border-dark);
+          color:#333;
+        }
+        .sb-item.ok{color:#008000}
+        .sb-item.warn{color:#cc6600}
+
+        /* ================================================================
+           ANIMATIONS & MISC
+        ================================================================ */
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+        .blink{animation:blink 1s ease infinite}
+
+        .highlight-rung{background:rgba(255,255,0,.15)}
+
+        /* scrollbar */
+        .ladder-body::-webkit-scrollbar{width:12px}
+        .ladder-body::-webkit-scrollbar-track{background:var(--panel-bg)}
+        .ladder-body::-webkit-scrollbar-thumb{
+          background:var(--steel2);
+          border:2px solid;
+          border-color:#fff #888 #888 #fff;
+        }
+    </style>
 </head>
 <body>
 
-<div class="scanline"></div>
+<div class="app-window">
 
-<header class="header">
-    <div class="header-left">
-        <div class="header-logo">
-            <div class="logo-icon">
-                <div class="logo-cpu">
-                    <div class="cpu-pin top"></div>
-                    <div class="cpu-pin top"></div>
-                    <div class="cpu-pin top"></div>
-                    <div class="cpu-core">CLP</div>
-                    <div class="cpu-pin bottom"></div>
-                    <div class="cpu-pin bottom"></div>
-                    <div class="cpu-pin bottom"></div>
-                </div>
-            </div>
-            <div>
-                <div class="logo-title">CLP SIMULATOR</div>
-                <div class="logo-sub">TIA Portal · SCL · IEC 61131-3</div>
-            </div>
+    <!-- TITLE BAR -->
+    <div class="title-bar">
+        <div class="title-icon">T</div>
+        <div class="title-text">TLP LogixPro Simulator — Equipe 3 · [CLP Simulador — OB / FC / FB]</div>
+        <div class="title-btns">
+            <div class="title-btn">_</div>
+            <div class="title-btn">□</div>
+            <div class="title-btn close">✕</div>
         </div>
     </div>
-    <div class="header-center">
-        <div class="status-bar">
-            <div class="status-item">
-                <div class="status-dot" id="hdr-run-dot"></div>
-                <span id="hdr-run-label">STOP</span>
-            </div>
-            <div class="status-sep"></div>
-            <div class="status-item">
-                <span class="status-muted">CICLOS OB1</span>
-                <span class="status-val mono" id="hdr-cycles">0</span>
-            </div>
-            <div class="status-sep"></div>
-            <div class="status-item">
-                <span class="status-muted">MOTOR</span>
-                <span class="status-val mono" id="hdr-motor">REPOUSO</span>
-            </div>
-        </div>
+
+    <!-- MENU BAR -->
+    <div class="menu-bar">
+        <div class="menu-item">Arquivo</div>
+        <div class="menu-item">Editar</div>
+        <div class="menu-item">Simulações</div>
+        <div class="menu-item">Configurações</div>
+        <div class="menu-item">Comms</div>
+        <div class="menu-item">Ajuda</div>
     </div>
-    <div class="header-right">
-        <div class="tag">EQUIPE 3</div>
-        <div class="version mono">v1.0.0</div>
+
+    <!-- TOOLBAR -->
+    <div class="toolbar">
+        <div class="tb-group">
+            <div class="tb-badge" id="tb-mode">ONLINE</div>
+            <div class="tb-badge" style="background:#006600" id="tb-forces">No Forces</div>
+        </div>
+        <div class="tb-group">
+            <div class="tb-btn" id="tb-run-btn" onclick="runPLC()">▶ RUN</div>
+            <div class="tb-btn" id="tb-stop-btn" onclick="stopPLC()" class="active">■ STOP</div>
+        </div>
+        <div class="tb-group">
+            <div class="tb-led off" id="tb-run-led"></div>
+            <div class="tb-label" id="tb-status-label">PLC — Offline</div>
+        </div>
+        <div class="tb-sep"></div>
+        <div class="tb-label">Scan:</div>
+        <div class="tb-scan" id="tb-scan">0 ms</div>
+        <div class="tb-sep"></div>
+        <div class="tb-label">Ciclos OB1:</div>
+        <div class="tb-scan" id="tb-cycles">0</div>
+        <div class="tb-sep"></div>
+        <div class="tb-label" style="color:#880000;font-weight:bold" id="tb-alarm"></div>
     </div>
-</header>
 
-<div class="layout">
+    <!-- MAIN AREA -->
+    <div class="main-area">
 
-    <!-- SIDEBAR -->
-    <nav class="sidebar">
-        <div class="sidebar-section-label">BLOCOS</div>
-        <button class="nav-item active" data-tab="ob" onclick="switchTab('ob',this)">
-            <div class="nav-icon ob-icon">OB</div>
-            <div class="nav-text">
-                <div class="nav-name">Organization Blocks</div>
-                <div class="nav-sub">Ciclo de execução</div>
-            </div>
-            <div class="nav-pulse" id="nav-ob-pulse"></div>
-        </button>
-        <button class="nav-item" data-tab="fc" onclick="switchTab('fc',this)">
-            <div class="nav-icon fc-icon">FC</div>
-            <div class="nav-text">
-                <div class="nav-name">Function</div>
-                <div class="nav-sub">Sem memória</div>
-            </div>
-        </button>
-        <button class="nav-item" data-tab="fb" onclick="switchTab('fb',this)">
-            <div class="nav-icon fb-icon">FB</div>
-            <div class="nav-text">
-                <div class="nav-name">Function Block</div>
-                <div class="nav-sub">Com memória</div>
-            </div>
-            <div class="nav-pulse" id="nav-fb-pulse"></div>
-        </button>
-        <button class="nav-item" data-tab="db" onclick="switchTab('db',this)">
-            <div class="nav-icon db-icon">DB</div>
-            <div class="nav-text">
-                <div class="nav-name">Data Blocks</div>
-                <div class="nav-sub">Memória do sistema</div>
-            </div>
-        </button>
+        <!-- LEFT: HMI + CTRL -->
+        <div class="hmi-panel">
 
-        <div class="sidebar-section-label" style="margin-top:24px">CONTROLES</div>
-        <div class="sim-controls">
-            <button class="ctrl-btn run-btn" id="run-btn" onclick="toggleRun()">
-                <span class="ctrl-icon">▶</span> INICIAR
-            </button>
-            <button class="ctrl-btn stop-btn" onclick="stopSim()" id="stop-btn" disabled>
-                <span class="ctrl-icon">■</span> PARAR
-            </button>
-        </div>
+            <!-- HMI WINDOW -->
+            <div class="hmi-window">
+                <div class="sub-title">ProSim Simulations — Silo Simulator</div>
+                <div class="hmi-canvas" id="hmi-canvas">
 
-        <div class="sidebar-section-label" style="margin-top:24px">DIFF FC × FB</div>
-        <div class="diff-card">
-            <div class="diff-row">
-                <div class="diff-block fc-block">FC<br><span>sem estado</span></div>
-                <div class="diff-block fb-block">FB<br><span>com estado</span></div>
-            </div>
-        </div>
-    </nav>
+                    <!-- Pipe vertical from silo to conveyor -->
+                    <div class="pipe pipe-v pipe-flow" id="pipe-v" style="left:196px;top:136px;height:56px"></div>
 
-    <!-- MAIN CONTENT -->
-    <main class="main">
-
-        <!-- ===== OB TAB ===== -->
-        <div id="tab-ob" class="tab-panel active">
-            <div class="panel-header">
-                <div class="panel-title">Organization Blocks — Ciclo de Execução</div>
-                <div class="panel-badge">RUNTIME</div>
-            </div>
-
-            <div class="ob-grid">
-                <div class="ob-card" id="obc-100">
-                    <div class="ob-card-header">
-                        <div class="ob-num">OB100</div>
-                        <div class="ob-badge startup-badge">STARTUP</div>
-                    </div>
-                    <div class="ob-card-title">Inicialização</div>
-                    <div class="ob-card-desc">Executado uma única vez ao ligar o CLP ou sair do modo STOP</div>
-                    <div class="ob-code">
-                        <span class="kw">ORGANIZATION_BLOCK</span> OB100_Startup
-                        <span class="cm">// Zera DBs e estado seguro</span>
-                        DB1.xSistemaHabilitado <span class="op">:=</span> <span class="kw">FALSE</span>;
-                        DB1.xModoManual <span class="op">:=</span> <span class="kw">TRUE</span>;
-                        DB1.iCiclosOB1 <span class="op">:=</span> <span class="num">0</span>;</div>
-                    <div class="ob-indicator">
-                        <div class="ob-led" id="led-ob100"></div>
-                        <span class="ob-exec-label" id="exec-ob100">—</span>
-                    </div>
-                </div>
-
-                <div class="ob-card active-ob" id="obc-1">
-                    <div class="ob-card-header">
-                        <div class="ob-num">OB1</div>
-                        <div class="ob-badge main-badge">MAIN</div>
-                    </div>
-                    <div class="ob-card-title">Programa Principal</div>
-                    <div class="ob-card-desc">Ciclo contínuo de varredura (~10ms). Chama FBs e consolida alarmes</div>
-                    <div class="ob-code">
-                        <span class="kw">ORGANIZATION_BLOCK</span> OB1_Main
-                        <span class="cm">// Ciclo principal</span>
-                        DB1.iCiclosOB1 <span class="op">:=</span> DB1.iCiclosOB1 <span class="op">+</span> <span class="num">1</span>;
-                        FB20_ControleMotor.DB20(...);</div>
-                    <div class="ob-indicator">
-                        <div class="ob-led" id="led-ob1"></div>
-                        <span class="ob-exec-label" id="exec-ob1">—</span>
-                    </div>
-                </div>
-
-                <div class="ob-card" id="obc-30">
-                    <div class="ob-card-header">
-                        <div class="ob-num">OB30</div>
-                        <div class="ob-badge cyclic-badge">500ms</div>
-                    </div>
-                    <div class="ob-card-title">Interrupção Cíclica</div>
-                    <div class="ob-card-desc">Dispara a cada 500ms para leitura de analógicos e chamada da FC</div>
-                    <div class="ob-code">
-                        <span class="kw">ORGANIZATION_BLOCK</span> OB30_CyclicInt
-                        <span class="cm">// A cada 500ms</span>
-                        FC10_Calculo_Temperatura(
-                        rCelsius <span class="op">:=</span> DB1.rPV,
-                        rFahrenheit <span class="op">=></span> DB1.rFahrenheit);</div>
-                    <div class="ob-indicator">
-                        <div class="ob-led" id="led-ob30"></div>
-                        <span class="ob-exec-label" id="exec-ob30">—</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="log-panel">
-                <div class="log-header">
-                    <div class="log-title">CONSOLE DE EXECUÇÃO</div>
-                    <button class="clear-btn" onclick="clearLog('ob-log')">LIMPAR</button>
-                </div>
-                <div class="log-body" id="ob-log"></div>
-            </div>
-        </div>
-
-        <!-- ===== FC TAB ===== -->
-        <div id="tab-fc" class="tab-panel">
-            <div class="panel-header">
-                <div class="panel-title">FC10 — Conversão de Temperatura</div>
-                <div class="panel-badge fc-badge-tag">SEM MEMÓRIA</div>
-            </div>
-
-            <div class="fc-layout">
-                <div class="code-panel">
-                    <div class="code-header">
-                        <div class="code-filename">FC10_Calculo_Temperatura.scl</div>
-                        <div class="code-lang">SCL</div>
-                    </div>
-                    <div class="code-body">
-                        <div class="code-line"><span class="ln">01</span><span class="kw">FUNCTION</span> <span class="fn">"FC10_Calculo_Temperatura"</span> : <span class="kw">VOID</span></div>
-                        <div class="code-line"><span class="ln">02</span>  TITLE = <span class="str">'FC: Conversão Celsius → Fahrenheit'</span></div>
-                        <div class="code-line"><span class="ln">03</span>  VERSION : <span class="str">'1.0'</span></div>
-                        <div class="code-line ln-empty"><span class="ln">04</span></div>
-                        <div class="code-line"><span class="ln">05</span><span class="kw">VAR_INPUT</span></div>
-                        <div class="code-line highlight-line"><span class="ln">06</span>  rCelsius : <span class="kw">REAL</span>; <span class="cm">// Temperatura de entrada (°C)</span></div>
-                        <div class="code-line"><span class="ln">07</span><span class="kw">END_VAR</span></div>
-                        <div class="code-line ln-empty"><span class="ln">08</span></div>
-                        <div class="code-line"><span class="ln">09</span><span class="kw">VAR_OUTPUT</span></div>
-                        <div class="code-line highlight-line"><span class="ln">10</span>  rFahrenheit : <span class="kw">REAL</span>; <span class="cm">// Temperatura convertida (°F)</span></div>
-                        <div class="code-line"><span class="ln">11</span><span class="kw">END_VAR</span></div>
-                        <div class="code-line ln-empty"><span class="ln">12</span></div>
-                        <div class="code-line"><span class="ln">13</span><span class="cm">// Sem VAR (sem memória interna!)</span></div>
-                        <div class="code-line ln-empty"><span class="ln">14</span></div>
-                        <div class="code-line"><span class="ln">15</span><span class="kw">BEGIN</span></div>
-                        <div class="code-line exec-line"><span class="ln">16</span>  rFahrenheit := (rCelsius <span class="op">*</span> <span class="num">9.0</span> / <span class="num">5.0</span>) <span class="op">+</span> <span class="num">32.0</span>;</div>
-                        <div class="code-line"><span class="ln">17</span><span class="kw">END_FUNCTION</span></div>
-                    </div>
-                </div>
-
-                <div class="fc-controls">
-                    <div class="io-card">
-                        <div class="io-header">ENTRADA</div>
-                        <div class="io-label">rCelsius</div>
-                        <div class="slider-wrap">
-                            <input type="range" min="-40" max="150" value="25" id="celsius-slider" oninput="calcFC(this.value)" class="styled-range">
+                    <!-- SILO -->
+                    <div class="silo">
+                        <div class="silo-body">
+                            <div class="silo-material" id="silo-material" style="height:60%"></div>
                         </div>
-                        <div class="io-value" id="fc-celsius-val">25.0 °C</div>
+                        <div class="silo-hopper"></div>
+                        <div class="silo-outlet"></div>
                     </div>
 
-                    <div class="arrow-block">
-                        <div class="arrow-line"></div>
-                        <div class="arrow-head">▶</div>
-                        <div class="arrow-formula">F = (C × 9/5) + 32</div>
-                    </div>
-
-                    <div class="io-card output-card">
-                        <div class="io-header">SAÍDA</div>
-                        <div class="io-label">rFahrenheit</div>
-                        <div class="io-big-val" id="fc-fahr-val">77.0</div>
-                        <div class="io-unit">°F</div>
-                    </div>
-
-                    <div class="no-memory-card">
-                        <div class="nm-icon">∅</div>
-                        <div class="nm-text">SEM MEMÓRIA INTERNA<br><span>Resultado recalculado a cada chamada</span></div>
-                    </div>
-
-                    <div class="gauge-wrap">
-                        <div class="gauge-label">ESCALA</div>
-                        <div class="gauge-bar">
-                            <div class="gauge-fill" id="gauge-fill"></div>
-                            <div class="gauge-thumb" id="gauge-thumb"></div>
-                        </div>
-                        <div class="gauge-minmax">
-                            <span>-40°C</span><span>150°C</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ===== FB TAB ===== -->
-        <div id="tab-fb" class="tab-panel">
-            <div class="panel-header">
-                <div class="panel-title">FB20 — Controle de Motor</div>
-                <div class="panel-badge fb-badge-tag">COM MEMÓRIA</div>
-            </div>
-
-            <div class="fb-layout">
-                <!-- Estado e Motor Visual -->
-                <div class="fb-top">
-                    <div class="motor-panel">
-                        <div class="motor-title">MOTOR 1 — BOMBA DE ÁGUA</div>
-                        <div class="motor-visual" id="motor-visual">
-                            <div class="motor-housing" id="motor-housing">
-                                <div class="motor-label" id="motor-label">M</div>
-                                <div class="motor-ring" id="motor-ring"></div>
-                            </div>
-                            <div class="shaft-line" id="shaft-line"></div>
-                            <div class="wheel-group">
-                                <div class="wheel-outer" id="wheel-outer">
-                                    <div class="wheel-spoke" id="wheel-spoke"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="motor-status-row">
-                            <div class="motor-stat">
-                                <div class="mstat-label">CONTATORA</div>
-                                <div class="mstat-val" id="m-contatora">OFF</div>
-                            </div>
-                            <div class="motor-stat">
-                                <div class="mstat-label">ROTAÇÃO</div>
-                                <div class="mstat-val" id="m-rot">OFF</div>
-                            </div>
-                            <div class="motor-stat">
-                                <div class="mstat-label">FALHAS</div>
-                                <div class="mstat-val" id="m-falhas">0</div>
-                            </div>
+                    <!-- SOLENOID VALVE -->
+                    <div class="valve-group" id="valve-group">
+                        <div class="valve-body" id="valve-body">
+                            <div class="valve-label">SOL<br>VLV</div>
+                            <div class="valve-arrow" id="valve-arrow"></div>
                         </div>
                     </div>
 
-                    <div class="state-panel">
-                        <div class="state-title">MÁQUINA DE ESTADOS — iEstadoInterno (DB20)</div>
-                        <div class="states-row">
-                            <div class="state-node s0 active-state" id="sn0">
-                                <div class="sn-num">0</div>
-                                <div class="sn-name">REPOUSO</div>
-                            </div>
-                            <div class="state-arrow">→</div>
-                            <div class="state-node s1" id="sn1">
-                                <div class="sn-num">1</div>
-                                <div class="sn-name">PARTINDO</div>
-                            </div>
-                            <div class="state-arrow">→</div>
-                            <div class="state-node s2" id="sn2">
-                                <div class="sn-num">2</div>
-                                <div class="sn-name">RODANDO</div>
-                            </div>
-                            <div class="state-arrow">→</div>
-                            <div class="state-node s3" id="sn3">
-                                <div class="sn-num">3</div>
-                                <div class="sn-name">PARANDO</div>
-                            </div>
-                            <div class="state-arrow">→</div>
-                            <div class="state-node s4" id="sn4">
-                                <div class="sn-num">4</div>
-                                <div class="sn-name">FALHA</div>
-                            </div>
+                    <!-- LEVEL SENSOR -->
+                    <div class="level-sensor">
+                        <div class="sensor-body">
+                            <div class="sensor-fill" id="sensor-fill" style="height:60%"></div>
                         </div>
-                        <div class="instance-tag">
-                            Instance DB: <span class="mono">DB20_MotorInstance</span> · iEstadoInterno = <span class="mono" id="state-db-val">0</span>
-                        </div>
+                        <div class="sensor-label">LEVEL<br>I:1/04</div>
                     </div>
-                </div>
 
-                <!-- Botões e Código -->
-                <div class="fb-bottom">
-                    <div class="cmd-panel">
-                        <div class="cmd-title">PAINEL DE COMANDO</div>
-                        <div class="cmd-buttons">
-                            <button class="cmd-btn start-cmd" onclick="fbCmd('partida')">
-                                <div class="cmd-btn-icon">▶</div>
-                                <div class="cmd-btn-label">PARTIDA</div>
-                                <div class="cmd-btn-sub">I0.0</div>
-                            </button>
-                            <button class="cmd-btn stop-cmd" onclick="fbCmd('parada')">
-                                <div class="cmd-btn-icon">■</div>
-                                <div class="cmd-btn-label">PARADA</div>
-                                <div class="cmd-btn-sub">I0.1 NF</div>
-                            </button>
-                            <button class="cmd-btn fault-cmd" onclick="fbCmd('falha')">
-                                <div class="cmd-btn-icon">⚡</div>
-                                <div class="cmd-btn-label">FALHA TÉRMICA</div>
-                                <div class="cmd-btn-sub">I0.2 NF</div>
-                            </button>
-                            <button class="cmd-btn reset-cmd" onclick="fbCmd('reset')">
-                                <div class="cmd-btn-icon">↺</div>
-                                <div class="cmd-btn-label">RESET</div>
-                                <div class="cmd-btn-sub">I0.4</div>
-                            </button>
+                    <!-- CONVEYOR -->
+                    <div class="conveyor-wrap">
+                        <div class="conveyor-track">
+                            <div class="conveyor-roller cr-left"></div>
+                            <div class="conveyor-stripes" id="conveyor-stripes"></div>
+                            <div class="conveyor-roller cr-right"></div>
+                        </div>
+                        <div class="roller-row">
+                            <div class="small-roller"></div>
+                            <div class="small-roller"></div>
+                            <div class="small-roller"></div>
+                            <div class="small-roller"></div>
+                            <div class="small-roller"></div>
+                            <div class="small-roller"></div>
+                            <div class="small-roller"></div>
+                            <div class="small-roller"></div>
                         </div>
                     </div>
 
-                    <div class="fb-code-mini">
-                        <div class="code-header">
-                            <div class="code-filename">FB20_ControleMotor.scl</div>
-                            <div class="code-lang">SCL</div>
+                    <!-- PROX SENSOR -->
+                    <div class="prox-sensor">
+                        <div class="prox-body">
+                            <div class="prox-led" id="prox-led"></div>
                         </div>
-                        <div class="code-body" style="font-size:11px;line-height:1.5">
-                            <div class="code-line"><span class="ln">01</span><span class="kw">VAR</span> <span class="cm">// STATIC — persiste no DB20</span></div>
-                            <div class="code-line mem-line"><span class="ln">02</span>  iEstadoInterno : <span class="kw">INT</span>; <span class="cm">// ← MEMÓRIA</span></div>
-                            <div class="code-line"><span class="ln">03</span><span class="kw">END_VAR</span></div>
-                            <div class="code-line"><span class="ln">04</span><span class="kw">CASE</span> iEstadoInterno <span class="kw">OF</span></div>
-                            <div class="code-line" id="cline-0"><span class="ln">05</span>  <span class="num">0</span>: <span class="kw">IF</span> xPartida <span class="kw">THEN</span> estado := <span class="num">1</span>; <span class="kw">END_IF</span>;</div>
-                            <div class="code-line" id="cline-1"><span class="ln">06</span>  <span class="num">1</span>: xContatora := <span class="kw">TRUE</span>; <span class="cm">// aguarda sensor</span></div>
-                            <div class="code-line" id="cline-2"><span class="ln">07</span>  <span class="num">2</span>: xContatora := <span class="kw">TRUE</span>; xMotorRodando := <span class="kw">TRUE</span>;</div>
-                            <div class="code-line" id="cline-3"><span class="ln">08</span>  <span class="num">3</span>: xContatora := <span class="kw">FALSE</span>; <span class="cm">// aguarda parada</span></div>
-                            <div class="code-line" id="cline-4"><span class="ln">09</span>  <span class="num">4</span>: <span class="cm">// FALHA — aguarda reset</span></div>
-                            <div class="code-line"><span class="ln">10</span><span class="kw">END_CASE</span>;</div>
+                        <div class="prox-label">PROX<br>I:1/03</div>
+                    </div>
+
+                    <!-- MOTOR -->
+                    <div class="motor-wrap">
+                        <div class="motor-body-svg">
+                            <div class="motor-shaft"></div>
+                            <div class="motor-fan" id="motor-fan"></div>
                         </div>
+                        <div class="motor-label-tag">MOTOR O:2/00</div>
+                    </div>
+
+                    <!-- Product box moving on conveyor -->
+                    <div class="product-box" id="product-box" style="left:30px;bottom:70px;display:none">PKG</div>
+
+                    <!-- STATUS indicators panel -->
+                    <div class="hmi-status">
+                        <div class="hmi-title-tag">PROCESS ANIMATIONS<br>Silo Simulator</div>
+                        <div class="hmi-row">
+                            <div class="hmi-ind ind-green" id="ind-run"></div>
+                            <div class="hmi-ind-label">RUN O:2/02</div>
+                        </div>
+                        <div class="hmi-row">
+                            <div class="hmi-ind ind-yellow" id="ind-fill"></div>
+                            <div class="hmi-ind-label">FILL O:2/03</div>
+                        </div>
+                        <div class="hmi-row">
+                            <div class="hmi-ind ind-green" id="ind-full"></div>
+                            <div class="hmi-ind-label">FULL O:2/04</div>
+                        </div>
+                        <div class="hmi-row">
+                            <div style="font-family:var(--mono);font-size:8px;color:#88aaff;margin-top:2px">Output</div>
+                            <div class="hmi-ind-label mono" id="hmi-out-h" style="color:#fff">000H</div>
+                        </div>
+                        <div class="hmi-row">
+                            <div style="font-family:var(--mono);font-size:8px;color:#88aaff"></div>
+                            <div class="hmi-ind-label mono" id="hmi-out-l" style="color:#fff">000H</div>
+                        </div>
+                    </div>
+
+                    <!-- I/O display -->
+                    <div class="io-panel">
+                        <div style="color:#88aaff;font-size:8px;border-bottom:1px solid #334;margin-bottom:2px;padding-bottom:2px">I/O STATUS</div>
+                        <div class="io-row"><span>I:1/03 PROX</span><span class="io-val" id="io-prox">OFF</span></div>
+                        <div class="io-row"><span>I:1/04 LEVEL</span><span class="io-val" id="io-level">OFF</span></div>
+                        <div class="io-row"><span>O:2/00 MOTOR</span><span class="io-val" id="io-motor">OFF</span></div>
+                        <div class="io-row"><span>O:2/01 SOL</span><span class="io-val" id="io-sol">OFF</span></div>
+                        <div class="io-row"><span>O:2/02 RUN</span><span class="io-val" id="io-run">OFF</span></div>
+                    </div>
+
+                </div><!-- hmi-canvas -->
+            </div><!-- hmi-window -->
+
+            <!-- CONTROL PANEL -->
+            <div class="ctrl-panel">
+                <div class="ctrl-section" style="min-width:110px">
+                    <div class="ctrl-title">INDICADORES</div>
+                    <div class="toggle-row">
+                        <div class="toggle-lamp" id="lamp-run"></div>
+                        <div class="toggle-label">RUN</div>
+                    </div>
+                    <div class="toggle-row">
+                        <div class="toggle-lamp" id="lamp-fill"></div>
+                        <div class="toggle-label">FILL</div>
+                    </div>
+                    <div class="toggle-row">
+                        <div class="toggle-lamp" id="lamp-full"></div>
+                        <div class="toggle-label">FULL</div>
                     </div>
                 </div>
 
-                <div class="log-panel">
-                    <div class="log-header">
-                        <div class="log-title">LOG DO FB20</div>
-                        <button class="clear-btn" onclick="clearLog('fb-log')">LIMPAR</button>
+                <div class="ctrl-section" style="min-width:100px">
+                    <div class="ctrl-title">COMANDO</div>
+                    <div style="display:flex;flex-direction:column;gap:5px">
+                        <button class="push-btn btn-start" onclick="cmdStart()">▶ START</button>
+                        <button class="push-btn btn-stop" onclick="cmdStop()">■ STOP</button>
                     </div>
-                    <div class="log-body" id="fb-log"></div>
                 </div>
+
+                <div class="ctrl-section" style="min-width:120px">
+                    <div class="ctrl-title">FC — TEMP (°C→°F)</div>
+                    <div style="display:flex;flex-direction:column;gap:4px">
+                        <div style="display:flex;gap:6px;align-items:center">
+                            <span style="font-size:9px;font-family:var(--mono);color:#555">SP °C:</span>
+                            <input type="range" min="-40" max="150" value="25" id="fc-slider" oninput="updateFC()" style="width:70px;height:12px">
+                            <span style="font-family:var(--mono);font-size:10px;min-width:28px" id="fc-c-val">25°C</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px">
+                            <span style="font-size:9px;font-family:var(--mono);color:#555">→ °F:</span>
+                            <span style="font-family:var(--mono);font-size:14px;font-weight:bold;color:#0000cc" id="fc-f-val">77.0°F</span>
+                        </div>
+                        <div style="font-size:8px;font-family:var(--mono);color:#888">FC10: (C×9/5)+32</div>
+                    </div>
+                </div>
+
+                <div class="ctrl-section" style="flex:1">
+                    <div class="ctrl-title">FB20 — MOTOR STATE</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <div id="fb-state-0" class="toggle-row" style="gap:4px">
+                            <div class="toggle-lamp on-green" id="fslamp-0"></div>
+                            <span style="font-size:9px;font-family:var(--mono)">0:REPOUSO</span>
+                        </div>
+                        <div class="toggle-row" style="gap:4px">
+                            <div class="toggle-lamp" id="fslamp-1"></div>
+                            <span style="font-size:9px;font-family:var(--mono)">1:PARTINDO</span>
+                        </div>
+                        <div class="toggle-row" style="gap:4px">
+                            <div class="toggle-lamp" id="fsamp-2"></div>
+                            <span style="font-size:9px;font-family:var(--mono)">2:RODANDO</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+                        <div class="toggle-row" style="gap:4px">
+                            <div class="toggle-lamp" id="fsamp-3"></div>
+                            <span style="font-size:9px;font-family:var(--mono)">3:PARANDO</span>
+                        </div>
+                        <div class="toggle-row" style="gap:4px">
+                            <div class="toggle-lamp" id="fsamp-4"></div>
+                            <span style="font-size:9px;font-family:var(--mono)">4:FALHA</span>
+                        </div>
+                        <button class="push-btn" style="height:20px;font-size:9px;background:#660099;color:#fff;border-color:#cc44ff #330066 #330066 #cc44ff" onclick="triggerFault()">⚡ FALHA</button>
+                        <button class="push-btn" style="height:20px;font-size:9px;background:#663300;color:#fff;border-color:#cc6600 #331100 #331100 #cc6600" onclick="resetFault()">↺ RESET</button>
+                    </div>
+                </div>
+            </div><!-- ctrl-panel -->
+
+        </div><!-- hmi-panel -->
+
+        <!-- RIGHT: LADDER DIAGRAM -->
+        <div class="ladder-panel">
+            <div class="sub-title">LAD 2: — FB20_ControleMotor + FC10_Calculo</div>
+            <div class="ladder-body" id="ladder-body">
+                <!-- Rungs rendered by JS -->
             </div>
-        </div>
-
-        <!-- ===== DB TAB ===== -->
-        <div id="tab-db" class="tab-panel">
-            <div class="panel-header">
-                <div class="panel-title">Data Blocks — Memória do Sistema</div>
-                <div class="panel-badge">LIVE</div>
+            <div class="ladder-tabs">
+                <div class="ladder-tab active">LAD 2</div>
+                <div class="ladder-tab">ssm 3</div>
+                <div class="ladder-tab">ssm 4</div>
+                <div class="ladder-tab">ssm 5</div>
+                <div class="ladder-tab">ssm 6</div>
+                <div class="ladder-tab">ssm 7</div>
             </div>
+        </div><!-- ladder-panel -->
 
-            <div class="db-layout">
-                <div class="db-card">
-                    <div class="db-card-header">
-                        <div class="db-type-badge global-db">GLOBAL DB</div>
-                        <div class="db-name">DB1_GlobalData</div>
-                    </div>
-                    <div class="db-desc">Dados compartilhados entre todos os blocos. Visível ao SCADA/HMI.</div>
-                    <div class="db-table" id="db-global"></div>
-                </div>
+    </div><!-- main-area -->
 
-                <div class="db-card">
-                    <div class="db-card-header">
-                        <div class="db-type-badge instance-db">INSTANCE DB</div>
-                        <div class="db-name">DB20_MotorInstance</div>
-                    </div>
-                    <div class="db-desc">Memória exclusiva do FB20. Gerado automaticamente. Cada motor tem o seu.</div>
-                    <div class="db-table" id="db-instance"></div>
-                </div>
+    <!-- STATUS BAR BOTTOM -->
+    <div class="status-bar-bottom">
+        <div class="sb-item" id="sb-plc">PLC: OFFLINE</div>
+        <div class="sb-item" id="sb-state">Estado: STOP</div>
+        <div class="sb-item">Projeto: Equipe3_CLP</div>
+        <div class="sb-item">IEC 61131-3 · SCL</div>
+        <div class="sb-item" id="sb-time"></div>
+    </div>
+
+</div><!-- app-window -->
+
+<script>
+    // ================================================================
+    // STATE
+    // ================================================================
+    const state = {
+      plcRunning: false,
+      motorState: 0,   // 0-4
+      motorOn: false,
+      solenoid: false,
+      level: 0.6,      // 0..1
+      proxActive: false,
+      cycleCount: 0,
+      ob30Count: 0,
+      scanTime: 0,
+      faultActive: false,
+      boxPos: 30,
+      boxVisible: false,
+      fcCelsius: 25
+    };
+
+    const STATE_NAMES = ['REPOUSO','PARTINDO','RODANDO','PARANDO','FALHA'];
+    const STATE_LAMP_IDS = ['fsamp-0','fsamp-1','fsamp-2','fsamp-3','fsamp-4'];
+    // fix typo in html above for state 0
+    const LAMP_IDS = ['fsamp-0','fsamp-1','fsamp-2','fsamp-3','fsamp-4'];
+
+    // ================================================================
+    // LADDER DIAGRAM BUILDER
+    // ================================================================
+    function buildLadder() {
+      const body = document.getElementById('ladder-body');
+      body.innerHTML = '';
+
+      const rungs = [
+        {
+          num: '000',
+          comment: '// OB1 — Rung 0: Motor liga se START e sem STOP e sem FALHA',
+          contacts: [
+            {type:'NO', name:'I:1/01\nSTART', id:'c-start'},
+            {type:'NC', name:'I:1/02\nSTOP', id:'c-stop'},
+            {type:'NC', name:'B3:0/4\nFALHA', id:'c-nofault'},
+          ],
+          parallel: {type:'NO', name:'O:2/00\nrodando', id:'c-selfhold'},
+          coil: {name:'O:2/00\nrodando', id:'coil-motor'},
+        },
+        {
+          num: '001',
+          comment: '// OB1 — Rung 1: Sinaleiro RUN + sensor de proximidade',
+          contacts: [
+            {type:'NO', name:'O:2/00\nrodando', id:'c-mot-run'},
+            {type:'NO', name:'I:1/03\nsenPROX', id:'c-prox'},
+          ],
+          parallel: null,
+          coil: {name:'O:2/02\nrun', id:'coil-run'},
+        },
+        {
+          num: '002',
+          comment: '// OB1 — Rung 2: Solenóide abre se rodando E nível não cheio',
+          contacts: [
+            {type:'NO', name:'I:1/01\nsenPROX', id:'c-prox2'},
+            {type:'NC', name:'O:2/04\ncheia', id:'c-notfull'},
+            {type:'NO', name:'O:2/00\nrodando', id:'c-rod2'},
+          ],
+          parallel: null,
+          coil: {name:'O:2/01\nsolenoid', id:'coil-sol'},
+          extraCoil: {name:'O:2/03\nenchendo', id:'coil-fill'},
+        },
+        {
+          num: '003',
+          comment: '// OB30 — FC10: Conversão Celsius→Fahrenheit (sem memória)',
+          isFC: true,
+          fcLabel: 'FC10_Calculo_Temperatura',
+          contacts: [
+            {type:'NO', name:'I:1/04\nsenNIVEL', id:'c-level'},
+            {type:'NC', name:'O:2/04\ncheia', id:'c-notfull2'},
+          ],
+          coil: {name:'O:2/04\ncheia', id:'coil-full'},
+        },
+        {
+          num: '004',
+          comment: '// FB20 — Rung 4: Máquina de estados CASE iEstado',
+          isFB: true,
+        },
+        {
+          num: '   ',
+          comment: '',
+          isEnd: true,
+        }
+      ];
+
+      rungs.forEach(rung => {
+        const row = document.createElement('div');
+        row.className = 'rung';
+        row.id = 'rung-' + rung.num;
+
+        if (rung.comment) {
+          const cmt = document.createElement('div');
+          cmt.style.cssText = 'font-size:9px;color:#888;font-family:var(--mono);padding:1px 0 0 32px;width:100%';
+          cmt.textContent = rung.comment;
+          body.appendChild(cmt);
+        }
+
+        if (rung.isEnd) {
+          row.innerHTML = `
+            <div class="rung-num">   </div>
+            <div class="power-rail-l"></div>
+            <div style="flex:1;display:flex;align-items:center;padding:0 8px">
+              <div class="h-wire" style="flex:1"></div>
+              <div style="font-family:var(--mono);font-size:11px;padding:0 8px;border:1px solid #888;background:#eee">END</div>
+              <div class="h-wire" style="flex:1"></div>
             </div>
-        </div>
+            <div class="power-rail-r"></div>
+          `;
+          body.appendChild(row);
+          return;
+        }
 
-    </main>
-</div>
+        if (rung.isFB) {
+          row.style.minHeight = '110px';
+          row.innerHTML = `
+            <div class="rung-num">${rung.num}</div>
+            <div class="power-rail-l"></div>
+            <div style="flex:1;padding:4px 8px;background:rgba(0,0,180,.04);border:1px solid #ccccaa">
+              <div style="font-family:var(--mono);font-size:9px;color:#0000aa;font-weight:bold;margin-bottom:4px">
+                FB20_ControleMotor — Instance DB: DB20_MotorInstance
+              </div>
+              <div id="fb-state-display" style="display:flex;gap:4px;flex-wrap:wrap">
+                ${STATE_NAMES.map((n,i)=>`
+                  <div id="fb-sbox-${i}" style="
+                    border:1px solid #aaa;padding:4px 8px;font-family:var(--mono);font-size:9px;
+                    background:#f0f0e8;transition:all .2s;cursor:default
+                  ">
+                    <div style="font-weight:bold">${i}: ${n}</div>
+                    <div style="color:#666;font-size:8px">${['xContatora=F','xContatora=T','Rodando=T','Parando','⚡ FALHA'][i]}</div>
+                  </div>
+                `).join('')}
+              </div>
+              <div style="margin-top:4px;font-family:var(--mono);font-size:8px;color:#666">
+                VAR iEstadoInterno: INT; // STATIC — persiste no DB20 entre ciclos
+              </div>
+            </div>
+            <div class="power-rail-r"></div>
+          `;
+          body.appendChild(row);
+          return;
+        }
 
-<script src="modules/fc.js"></script>
-<script src="modules/fb.js"></script>
-<script src="modules/ob.js"></script>
-<script src="modules/db.js"></script>
-<script src="main.js"></script>
+        if (rung.isFC) {
+          row.innerHTML = `
+            <div class="rung-num">${rung.num}</div>
+            <div class="power-rail-l"></div>
+            <div style="flex:1;display:flex;align-items:center">
+              <div class="h-wire" id="hw-${rung.num}-0" style="width:8px;flex:none"></div>
+              ${rung.contacts.map((c,ci)=>`
+                <div class="contact ${c.type==='NC'?'contact-nc':''}" id="${c.id}" style="width:44px">
+                  <div class="contact-name">${c.name}</div>
+                  <div class="contact-body">
+                    <div class="contact-line-l"></div>
+                    <div class="contact-poles">
+                      <div class="contact-pole"></div>
+                      <div class="contact-pole"></div>
+                    </div>
+                    <div class="contact-line-r"></div>
+                  </div>
+                </div>
+                <div class="h-wire" id="hw-${rung.num}-${ci+1}" style="width:4px;flex:none"></div>
+              `).join('')}
+              <div style="border:2px solid #668;background:#eeeef8;padding:3px 6px;font-family:var(--mono);font-size:8px;flex-shrink:0" id="fc-block">
+                <div style="background:#336;color:#fff;padding:1px 3px;font-weight:bold;margin:-3px -6px 3px;text-align:center">FC10</div>
+                <div>IN: rCelsius := <span id="fc-in-lad">25.0</span>°C</div>
+                <div>OUT: rFahrenheit = <span id="fc-out-lad" style="color:#0000cc;font-weight:bold">77.0</span>°F</div>
+                <div style="color:#888;font-size:7px">(C×9/5)+32 — sem VAR</div>
+              </div>
+              <div class="h-wire" style="flex:1" id="hw-${rung.num}-last"></div>
+              <div class="coil" id="${rung.coil.id}">
+                <div class="coil-name">${rung.coil.name}</div>
+                <div class="coil-body">
+                  <div class="coil-line-l"></div>
+                  <div class="coil-circle"></div>
+                  <div class="coil-line-r"></div>
+                </div>
+              </div>
+            </div>
+            <div class="power-rail-r"></div>
+          `;
+          body.appendChild(row);
+          return;
+        }
+
+        // Normal rung
+        let contactsHTML = rung.contacts.map((c,ci) => `
+          <div class="contact ${c.type==='NC'?'contact-nc':''}" id="${c.id}">
+            <div class="contact-name">${c.name}</div>
+            <div class="contact-body">
+              <div class="contact-line-l"></div>
+              <div class="contact-poles">
+                <div class="contact-pole"></div>
+                <div class="contact-pole"></div>
+              </div>
+              <div class="contact-line-r"></div>
+            </div>
+          </div>
+          <div class="h-wire" id="hw-${rung.num}-${ci}" style="width:6px;flex:none"></div>
+        `).join('');
+
+        let parallelHTML = '';
+        if (rung.parallel) {
+          parallelHTML = `
+            <div class="branch-v" id="bv-${rung.num}-l"></div>
+            <div class="contact" id="${rung.parallel.id}" style="width:44px">
+              <div class="contact-name">${rung.parallel.name}</div>
+              <div class="contact-body">
+                <div class="contact-line-l"></div>
+                <div class="contact-poles"><div class="contact-pole"></div><div class="contact-pole"></div></div>
+                <div class="contact-line-r"></div>
+              </div>
+            </div>
+            <div class="branch-v" id="bv-${rung.num}-r"></div>
+          `;
+        }
+
+        let coilsHTML = `
+          <div class="h-wire" id="hw-${rung.num}-last" style="flex:1"></div>
+          <div class="coil" id="${rung.coil.id}">
+            <div class="coil-name">${rung.coil.name}</div>
+            <div class="coil-body">
+              <div class="coil-line-l"></div>
+              <div class="coil-circle"></div>
+              <div class="coil-line-r"></div>
+            </div>
+          </div>
+        `;
+        if (rung.extraCoil) {
+          coilsHTML += `
+            <div style="width:4px"></div>
+            <div class="coil" id="${rung.extraCoil.id}">
+              <div class="coil-name">${rung.extraCoil.name}</div>
+              <div class="coil-body">
+                <div class="coil-line-l"></div>
+                <div class="coil-circle"></div>
+                <div class="coil-line-r"></div>
+              </div>
+            </div>
+          `;
+        }
+
+        row.innerHTML = `
+          <div class="rung-num">${rung.num}</div>
+          <div class="power-rail-l"></div>
+          <div style="flex:1;display:flex;flex-direction:column;position:relative">
+            <div style="display:flex;align-items:center">
+              <div class="h-wire" style="width:6px;flex:none"></div>
+              ${contactsHTML}
+              ${coilsHTML}
+            </div>
+            ${rung.parallel ? `
+            <div style="display:flex;align-items:center;position:absolute;top:28px;left:0">
+              ${parallelHTML}
+            </div>` : ''}
+          </div>
+          <div class="power-rail-r"></div>
+        `;
+
+        body.appendChild(row);
+      });
+    }
+
+    // ================================================================
+    // FC10 — STATELESS CALCULATION
+    // ================================================================
+    function fc10(celsius) {
+      return parseFloat(((celsius * 9.0 / 5.0) + 32.0).toFixed(1));
+    }
+
+    function updateFC() {
+      const c = parseFloat(document.getElementById('fc-slider').value);
+      state.fcCelsius = c;
+      const f = fc10(c);
+      document.getElementById('fc-c-val').textContent = c + '°C';
+      document.getElementById('fc-f-val').textContent = f.toFixed(1) + '°F';
+      const inLad = document.getElementById('fc-in-lad');
+      const outLad = document.getElementById('fc-out-lad');
+      if (inLad) inLad.textContent = c.toFixed(1);
+      if (outLad) outLad.textContent = f.toFixed(1);
+    }
+
+    // ================================================================
+    // FB20 — STATE MACHINE
+    // ================================================================
+    function setMotorState(s) {
+      state.motorState = s;
+      // Update state boxes in ladder
+      for (let i = 0; i < 5; i++) {
+        const box = document.getElementById('fb-sbox-' + i);
+        if (!box) continue;
+        if (i === s) {
+          const colors = ['#e0ffe0','#fff8e0','#e0ffe0','#e0eeff','#ffe0e0'];
+          const borders = ['#008800','#aa6600','#008800','#0044aa','#aa0000'];
+          box.style.background = colors[s];
+          box.style.borderColor = borders[s];
+          box.style.fontWeight = 'bold';
+        } else {
+          box.style.background = '#f0f0e8';
+          box.style.borderColor = '#aaa';
+          box.style.fontWeight = 'normal';
+        }
+      }
+      // Update lamp indicators in ctrl panel
+      const ids = ['fsamp-0','fsamp-1','fsamp-2','fsamp-3','fsamp-4'];
+      const lampClasses = ['on-green','on-yellow','on-green','on-yellow','on-red'];
+      ids.forEach((id, i) => {
+        const el = document.getElementById(id) || document.getElementById(id.replace('fsamp','fsamp'));
+        if (!el) return;
+        el.className = 'toggle-lamp' + (i === s ? ' ' + lampClasses[i] : '');
+      });
+
+      // Also fix the "fsamp-0" id typo — use separate IDs
+      updateLampById('fsamp-0', s === 0, 'on-green');
+      updateLampById('fsamp-1', s === 1, 'on-yellow');
+      updateLampById('fsamp-2', s === 2, 'on-green');
+      updateLampById('fsamp-3', s === 3, 'on-yellow');
+      updateLampById('fsamp-4', s === 4, 'on-red');
+    }
+
+    function updateLampById(id, on, cls) {
+      // handle both fsamp and fsamp aliases
+      ['fsamp-','fsamp-'].forEach((prefix, pi) => {
+        const num = id.split('-')[1];
+        const el = document.getElementById('fsamp-' + num);
+        if (el) el.className = 'toggle-lamp' + (on ? ' ' + cls : '');
+      });
+    }
+
+    // ================================================================
+    // PLC CYCLE
+    // ================================================================
+    let _cycleTimer = null;
+    let _ob30Sub = 0;
+    let _boxTimer = null;
+
+    function runPLC() {
+      if (state.plcRunning) return;
+      state.plcRunning = true;
+      document.getElementById('tb-run-btn').classList.add('active');
+      document.getElementById('tb-stop-btn').classList.remove('active');
+      document.getElementById('tb-run-led').className = 'tb-led green';
+      document.getElementById('tb-status-label').textContent = 'PLC — Online · RUN';
+      document.getElementById('sb-plc').textContent = 'PLC: ONLINE';
+      document.getElementById('sb-state').textContent = 'Estado: RUN';
+      document.getElementById('tb-mode').textContent = 'ONLINE';
+
+      _cycleTimer = setInterval(scanCycle, 100);
+    }
+
+    function stopPLC() {
+      state.plcRunning = false;
+      clearInterval(_cycleTimer);
+      document.getElementById('tb-run-btn').classList.remove('active');
+      document.getElementById('tb-stop-btn').classList.add('active');
+      document.getElementById('tb-run-led').className = 'tb-led red';
+      document.getElementById('tb-status-label').textContent = 'PLC — STOP';
+      document.getElementById('sb-plc').textContent = 'PLC: ONLINE';
+      document.getElementById('sb-state').textContent = 'Estado: STOP';
+      // Turn off motor
+      state.motorOn = false;
+      state.solenoid = false;
+      updateHMI();
+    }
+
+    function cmdStart() {
+      if (!state.plcRunning) { runPLC(); return; }
+      if (state.motorState === 4) { alert('Reset a falha primeiro!'); return; }
+      if (state.motorState !== 0) return;
+      setMotorState(1);
+      setTimeout(() => {
+        setMotorState(2);
+        state.motorOn = true;
+        state.solenoid = true;
+        state.proxActive = true;
+        spawnBox();
+      }, 800);
+    }
+
+    function cmdStop() {
+      if (state.motorState === 0 || state.motorState === 4) return;
+      state.motorOn = false;
+      state.solenoid = false;
+      state.proxActive = false;
+      setMotorState(3);
+      setTimeout(() => setMotorState(0), 1000);
+      clearBoxTimers();
+    }
+
+    function triggerFault() {
+      if (state.motorState === 0 || state.motorState === 4) return;
+      state.motorOn = false;
+      state.solenoid = false;
+      state.faultActive = true;
+      setMotorState(4);
+      document.getElementById('tb-alarm').textContent = '⚠ FALHA TÉRMICA';
+      clearBoxTimers();
+    }
+
+    function resetFault() {
+      if (state.motorState !== 4) return;
+      state.faultActive = false;
+      setMotorState(0);
+      document.getElementById('tb-alarm').textContent = '';
+    }
+
+    function clearBoxTimers() {
+      clearTimeout(_boxTimer);
+      state.boxVisible = false;
+      const box = document.getElementById('product-box');
+      if (box) box.style.display = 'none';
+    }
+
+    function spawnBox() {
+      state.boxVisible = true;
+      state.boxPos = 30;
+      const box = document.getElementById('product-box');
+      if (box) { box.style.display = 'flex'; box.style.left = '30px'; }
+      moveBox();
+    }
+
+    function moveBox() {
+      if (!state.motorOn) return;
+      state.boxPos += 3;
+      const box = document.getElementById('product-box');
+      if (box) box.style.left = state.boxPos + 'px';
+
+      // Prox sensor detect
+      if (state.boxPos > 70 && state.boxPos < 110) {
+        state.proxActive = true;
+      }
+
+      if (state.boxPos > 370) {
+        box.style.display = 'none';
+        state.boxVisible = false;
+        setTimeout(spawnBox, 1500);
+        return;
+      }
+      _boxTimer = setTimeout(moveBox, 60);
+    }
+
+    function scanCycle() {
+      if (!state.plcRunning) return;
+      state.cycleCount++;
+      _ob30Sub++;
+
+      // Simulated scan time variation
+      state.scanTime = 8 + Math.floor(Math.random() * 4);
+      document.getElementById('tb-scan').textContent = state.scanTime + ' ms';
+      document.getElementById('tb-cycles').textContent = state.cycleCount;
+
+      // OB30 every 5 scans (~500ms)
+      if (_ob30Sub >= 5) {
+        _ob30Sub = 0;
+        state.ob30Count++;
+        // FC10 called here
+        updateFC();
+        // Level simulation
+        if (state.solenoid && state.level < 0.98) state.level = Math.min(1, state.level + 0.04);
+        if (!state.solenoid && state.level > 0.02) state.level = Math.max(0, state.level - 0.02);
+      }
+
+      updateHMI();
+      updateLadder();
+    }
+
+    // ================================================================
+    // HMI UPDATE
+    // ================================================================
+    function updateHMI() {
+      const s = state;
+      const running = s.motorState === 2;
+      const filling = s.solenoid;
+      const full = s.level > 0.9;
+
+      // Motor visual
+      const fan = document.getElementById('motor-fan');
+      if (fan) fan.className = 'motor-fan' + (running ? ' spinning' : '');
+
+      // Conveyor
+      const stripes = document.getElementById('conveyor-stripes');
+      if (stripes) stripes.className = 'conveyor-stripes' + (running ? ' running' : '');
+
+      // Valve
+      const vb = document.getElementById('valve-body');
+      if (vb) vb.className = 'valve-body' + (filling ? ' open' : '');
+
+      // Pipe flow
+      const pv = document.getElementById('pipe-v');
+      if (pv) pv.className = 'pipe pipe-v pipe-flow' + (filling ? ' flowing' : '');
+
+      // Level / silo material
+      const silo = document.getElementById('silo-material');
+      if (silo) silo.style.height = (s.level * 75) + '%';
+      const sensor = document.getElementById('sensor-fill');
+      if (sensor) sensor.style.height = (s.level * 100) + '%';
+
+      // Prox sensor
+      const prox = document.getElementById('prox-led');
+      if (prox) prox.className = 'prox-led' + (s.proxActive ? ' on' : '');
+
+      // Status indicators
+      setInd('ind-run', running);
+      setInd('ind-fill', filling);
+      setInd('ind-full', full);
+
+      // Lamps
+      setLamp('lamp-run', running, 'on-green');
+      setLamp('lamp-fill', filling, 'on-yellow');
+      setLamp('lamp-full', full, 'on-green');
+
+      // I/O
+      setIO('io-prox', s.proxActive);
+      setIO('io-level', full);
+      setIO('io-motor', running);
+      setIO('io-sol', filling);
+      setIO('io-run', running);
+
+      // HMI output hex
+      let outH = 0;
+      if (running) outH |= 0x01;
+      if (filling) outH |= 0x02;
+      if (s.proxActive) outH |= 0x04;
+      document.getElementById('hmi-out-h').textContent = outH.toString(16).toUpperCase().padStart(3,'0') + 'H';
+      document.getElementById('hmi-out-l').textContent = (s.cycleCount % 256).toString(16).toUpperCase().padStart(3,'0') + 'H';
+    }
+
+    function setInd(id, on) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const base = el.className.replace(' on','');
+      el.className = base + (on ? ' on' : '');
+    }
+
+    function setLamp(id, on, cls) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = 'toggle-lamp' + (on ? ' ' + cls : '');
+    }
+
+    function setIO(id, on) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = on ? 'ON' : 'OFF';
+      el.className = 'io-val' + (on ? ' active' : '');
+    }
+
+    // ================================================================
+    // LADDER UPDATE (energized states)
+    // ================================================================
+    function updateLadder() {
+      const running = state.motorState === 2;
+      const filling = state.solenoid;
+      const full = state.level > 0.9;
+      const prox = state.proxActive;
+      const nofault = !state.faultActive;
+
+      // Rung 0: motor self-holding
+      setContact('c-start', false); // momentary
+      setContact('c-stop', true);   // NC energized when not pressed
+      setContact('c-nofault', nofault);
+      setContact('c-selfhold', running);
+      setCoil('coil-motor', running);
+
+      // Rung 1
+      setContact('c-mot-run', running);
+      setContact('c-prox', prox);
+      setCoil('coil-run', running && prox);
+
+      // Rung 2
+      setContact('c-prox2', prox);
+      setContact('c-notfull', !full);
+      setContact('c-rod2', running);
+      setCoil('coil-sol', filling);
+      setCoil('coil-fill', filling);
+
+      // Rung 3 (FC) — always passes if level sensor active
+      setContact('c-level', state.level > 0.5);
+      setContact('c-notfull2', !full);
+      setCoil('coil-full', full);
+
+      // FC block highlight
+      const fcBlock = document.getElementById('fc-block');
+      if (fcBlock) fcBlock.style.borderColor = state.plcRunning ? '#0000cc' : '#668';
+    }
+
+    function setContact(id, on) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (on) el.classList.add('energized');
+      else el.classList.remove('energized');
+      // Also energize wires (simplified)
+    }
+
+    function setCoil(id, on) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (on) el.classList.add('energized');
+      else el.classList.remove('energized');
+    }
+
+    // ================================================================
+    // STATUS BAR CLOCK
+    // ================================================================
+    function updateClock() {
+      const el = document.getElementById('sb-time');
+      if (el) el.textContent = new Date().toLocaleTimeString('pt-BR');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ================================================================
+    // INIT
+    // ================================================================
+    buildLadder();
+    updateFC();
+    setMotorState(0);
+    updateHMI();
+
+    // Fix lamp IDs (there's a naming inconsistency between 'fsamp' and 'fsamp')
+    // Patch on init
+    ['0','1','2','3','4'].forEach(i => {
+      const el = document.getElementById('fsamp-' + i);
+      if (!el) {
+        const div = document.createElement('div');
+        div.id = 'fsamp-' + i;
+        div.className = 'toggle-lamp';
+        div.style.display = 'none';
+        document.body.appendChild(div);
+      }
+    });
+</script>
 </body>
 </html>
