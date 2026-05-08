@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SCADA — Silos de Arroz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+/* ===== VARIABLES ===== */
+:root {
+  --bg-canvas:    #0d0d0d;
+  --bg-panel:     #141414;
+  --bg-panel-2:   #1a1a1a;
+  --bg-header:    #111111;
+  --border:       rgba(255,255,255,0.08);
+  --border-hover: rgba(255,255,255,0.16);
+  --border-panel: #1f1f1f;
+  --text-primary:   #d8d9da;
+  --text-secondary: #8e8e8e;
+  --text-muted:     #545454;
+  --text-bright:    #ffffff;
+  --green:      #73bf69;
+  --green-dim:  rgba(115,191,105,0.18);
+  --yellow:     #fade2a;
+  --orange:     #ff9830;
+  --orange-dim: rgba(255,152,48,0.18);
+  --red:        #f2495c;
+  --blue:       #5794f2;
+  --blue-dim:   rgba(87,148,242,0.15);
+  --gauge-ok:    #73bf69;
+  --gauge-warn:  #ff9830;
+  --gauge-crit:  #f2495c;
+  --gauge-track: rgba(255,255,255,0.07);
+  --grid-color:  rgba(255,255,255,0.04);
+  --r-sm: 2px; --r-md: 4px; --r-lg: 6px;
+  --font-ui:   'Barlow', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+}
+
+/* ===== BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; -webkit-font-smoothing: antialiased; }
+body { font-family: var(--font-ui); background: var(--bg-canvas); color: var(--text-primary); min-height: 100vh; line-height: 1.4; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-canvas); }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+
+@keyframes pulse-dot {
+  0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(115,191,105,0.5); }
+  50%      { opacity:0.7; box-shadow: 0 0 0 5px rgba(115,191,105,0); }
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
+@keyframes fade-in-row { from { background: rgba(115,191,105,0.1); } to { background: transparent; } }
+
+/* ===== LAYOUT ===== */
+.app-wrapper { display:flex; flex-direction:column; min-height:100vh; }
+
+/* Topbar */
+.topbar {
+  height: 40px; background: var(--bg-header);
+  border-bottom: 1px solid var(--border-panel);
+  display: flex; align-items: center; padding: 0 12px; gap: 6px;
+  position: sticky; top: 0; z-index: 200; flex-shrink: 0;
+}
+.topbar-logo { width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:17px; margin-right:4px; flex-shrink:0; }
+.topbar-title { font-size:13px; font-weight:600; color:var(--text-bright); margin-right:2px; white-space:nowrap; }
+.topbar-subtitle { font-size:13px; color:var(--text-secondary); margin-right:12px; white-space:nowrap; }
+.topbar-div { width:1px; height:18px; background:var(--border-panel); margin:0 8px; }
+.topbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; flex-shrink:0; }
+
+/* Dashboard */
+.dashboard { flex:1; padding:6px; display:flex; flex-direction:column; gap:4px; }
+
+/* Section */
+.section { }
+.section-hdr {
+  display:flex; align-items:center; gap:8px;
+  padding:3px 8px; background:#171717; border:1px solid var(--border-panel);
+  border-radius:var(--r-sm); cursor:pointer; user-select:none; margin-bottom:4px;
+}
+.section-hdr:hover { background:#1c1c1c; }
+.section-caret { font-size:9px; color:var(--text-muted); }
+.section-title { font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.07em; }
+.section-body { display:grid; gap:4px; }
+
+.row-kpi      { grid-template-columns: 155px 1fr 1fr 1fr; }
+.row-gauges-8 { grid-template-columns: repeat(8, 1fr); }
+.row-bottom   { grid-template-columns: 2fr 1fr 1fr; }
+
+/* Panel */
+.panel { background:var(--bg-panel); border:1px solid var(--border-panel); border-radius:var(--r-sm); overflow:hidden; display:flex; flex-direction:column; }
+.panel-hdr {
+  padding:4px 10px 3px; display:flex; align-items:center; justify-content:space-between;
+  flex-shrink:0; border-bottom:1px solid var(--border-panel); min-height:26px;
+}
+.panel-title { font-size:11px; font-weight:500; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.panel-body { flex:1; padding:8px; min-height:0; display:flex; flex-direction:column; }
+
+/* ===== COMPONENTS ===== */
+.tb-pill {
+  display:inline-flex; align-items:center; gap:4px; padding:2px 9px;
+  border-radius:var(--r-md); border:1px solid var(--border-panel);
+  background:var(--bg-panel-2); font-size:11px; color:var(--text-secondary);
+  cursor:pointer; transition:all 0.15s; white-space:nowrap;
+}
+.tb-pill:hover { border-color:var(--border-hover); color:var(--text-primary); }
+.tb-pill.active { background:var(--green-dim); border-color:var(--green); color:var(--green); }
+
+.live-badge {
+  display:inline-flex; align-items:center; gap:5px; padding:2px 8px;
+  border-radius:var(--r-md); font-size:11px; font-family:var(--font-mono);
+  color:var(--green); background:var(--green-dim);
+  border:1px solid rgba(115,191,105,0.25); letter-spacing:0.04em;
+}
+.live-badge .dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse-dot 1.8s ease-in-out infinite; flex-shrink:0; }
+.live-badge.paused { color:var(--orange); background:var(--orange-dim); border-color:rgba(255,152,48,0.25); }
+.live-badge.paused .dot { background:var(--orange); animation:blink 1s step-end infinite; }
+
+.btn-sm {
+  display:inline-flex; align-items:center; gap:4px; padding:3px 10px;
+  border-radius:var(--r-md); border:1px solid var(--border-panel);
+  background:transparent; color:var(--text-secondary); font-size:11px;
+  font-family:var(--font-ui); cursor:pointer; transition:all 0.15s;
+}
+.btn-sm:hover { border-color:var(--border-hover); color:var(--text-primary); }
+
+.ts { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+
+/* Stat panel */
+.stat-panel { display:flex; flex-direction:column; justify-content:center; gap:14px; height:100%; }
+.stat-label { font-size:10px; color:var(--text-secondary); margin-bottom:3px; text-transform:uppercase; letter-spacing:0.05em; }
+.stat-val { font-family:var(--font-mono); font-size:26px; color:var(--text-bright); line-height:1; }
+.stat-val.md  { font-size:18px; }
+.stat-val.sm  { font-size:15px; }
+.stat-val.green  { color:var(--green); }
+.stat-val.yellow { color:var(--yellow); }
+.stat-val.orange { color:var(--orange); }
+.flash { color:var(--green) !important; transition:color 0.5s; }
+
+/* Gauge */
+.gauge-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; padding:6px 2px 2px; }
+
+/* Chart wrapper */
+.chart-wrap { position:relative; flex:1; min-height:0; }
+.chart-wrap canvas { display:block; width:100% !important; height:100% !important; }
+
+/* Legend strip */
+.legend-strip { display:flex; gap:14px; flex-wrap:wrap; padding:3px 0 0; border-top:1px solid var(--border-panel); margin-top:3px; align-items:center; }
+.legend-item { display:flex; align-items:center; gap:4px; font-size:10px; color:var(--text-muted); }
+.legend-line { width:12px; height:2px; border-radius:1px; }
+.legend-stats { display:flex; gap:6px; font-family:var(--font-mono); font-size:10px; color:var(--text-muted); }
+.legend-stats span { color:var(--text-secondary); }
+
+/* Alert dot */
+.alert-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.alert-ok   { background:var(--green);  box-shadow:0 0 4px var(--green); }
+.alert-warn { background:var(--orange); box-shadow:0 0 4px var(--orange); }
+.alert-crit { background:var(--red);    box-shadow:0 0 4px var(--red); animation:blink 0.8s step-end infinite; }
+
+/* Log table */
+.log-wrap { overflow-y:auto; flex:1; }
+.log-table { width:100%; border-collapse:collapse; }
+.log-table th { position:sticky; top:0; background:var(--bg-panel); padding:4px 8px; text-align:left; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-muted); border-bottom:1px solid var(--border-panel); }
+.log-table td { padding:3px 8px; font-family:var(--font-mono); font-size:11px; color:var(--text-secondary); border-bottom:1px solid rgba(255,255,255,0.03); }
+.log-table tr:hover td { background:rgba(255,255,255,0.02); }
+.log-table tr.new-row td { animation:fade-in-row 0.4s ease; }
+.tag-a { color:var(--green); }
+.tag-b { color:var(--blue); }
+
+/* Donut labels */
+.donut-leg { display:flex; align-items:center; gap:6px; font-size:11px; }
+.donut-sq  { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+
+/* Responsive */
+@media (max-width: 1200px) { .row-kpi { grid-template-columns: 140px 1fr 1fr; } .row-kpi .span-bar { display:none; } }
+@media (max-width: 1000px) { .row-gauges-8 { grid-template-columns: repeat(4, 1fr); } .row-kpi { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px)  { .row-gauges-8 { grid-template-columns: repeat(3, 1fr); } .row-bottom { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="app-wrapper">
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-logo">🌾</div>
+  <span class="topbar-title">SCADA Silos</span>
+  <span class="topbar-subtitle">— Visão Geral</span>
+  <div class="topbar-div"></div>
+  <span class="tb-pill active">Silo A ▾</span>
+  <span class="tb-pill">Silo B ▾</span>
+  <span class="tb-pill">Turno ▾</span>
+  <div class="topbar-right">
+    <div id="badge-live" class="live-badge">
+      <span class="dot"></span>
+      <span class="dot-label">AO VIVO</span>
+    </div>
+    <span class="ts" id="header-clock">--:--:--</span>
+    <button class="btn-sm" id="btn-toggle">⏸ Pausar</button>
+    <button class="btn-sm" id="btn-reset">↺ Reset</button>
+  </div>
+</header>
+
+<!-- DASHBOARD -->
+<div class="dashboard">
+
+  <!-- SEÇÃO 1: CLUSTER STATUS -->
+  <div class="section">
+    <div class="section-hdr" onclick="toggleSection(this)">
+      <span class="section-caret">▼</span>
+      <span class="section-title">Status do Cluster</span>
+    </div>
+    <div class="section-body row-kpi" style="min-height:190px;">
+
+      <div class="panel">
+        <div class="panel-hdr"><span class="panel-title">Resumo Geral</span></div>
+        <div class="panel-body">
+          <div class="stat-panel">
+            <div>
+              <div class="stat-label">Último Registro</div>
+              <div class="stat-val md" id="kpi-hora">--:--:--</div>
+            </div>
+            <div>
+              <div class="stat-label">Total de Sacas</div>
+              <div class="stat-val green" id="kpi-total">0</div>
+            </div>
+            <div>
+              <div class="stat-label">Ritmo Atual</div>
+              <div class="stat-val sm yellow" id="kpi-ritmo">0 <span style="font-size:11px;color:var(--text-muted)">sc/min</span></div>
+            </div>
+            <div>
+              <div class="stat-label">Peso Total</div>
+              <div class="stat-val sm orange" id="kpi-peso">0.00 <span style="font-size:11px;color:var(--text-muted)">ton</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hdr">
+          <span class="panel-title">Silo A — Fluxo por Minuto</span>
+          <span class="alert-dot alert-ok"></span>
+        </div>
+        <div class="panel-body">
+          <div class="chart-wrap"><canvas id="chart-line-a"></canvas></div>
+          <div class="legend-strip">
+            <div class="legend-item"><div class="legend-line" style="background:var(--green)"></div>silo_a.fluxo</div>
+            <div class="legend-stats">min <span id="stat-a-min">0</span> avg <span id="stat-a-avg">0</span> cur <span id="stat-a-cur">0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hdr">
+          <span class="panel-title">Silo B — Fluxo por Minuto</span>
+          <span class="alert-dot alert-ok"></span>
+        </div>
+        <div class="panel-body">
+          <div class="chart-wrap"><canvas id="chart-line-b"></canvas></div>
+          <div class="legend-strip">
+            <div class="legend-item"><div class="legend-line" style="background:var(--blue)"></div>silo_b.fluxo</div>
+            <div class="legend-stats">min <span id="stat-b-min">0</span> avg <span id="stat-b-avg">0</span> cur <span id="stat-b-cur">0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hdr"><span class="panel-title">Produção Comparativa</span></div>
+        <div class="panel-body">
+          <div class="chart-wrap"><canvas id="chart-bar"></canvas></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SEÇÃO 2: GAUGES DOS SILOS -->
+  <div class="section">
+    <div class="section-hdr" onclick="toggleSection(this)">
+      <span class="section-caret">▼</span>
+      <span class="section-title">Status dos Silos — Ocupação</span>
+    </div>
+    <div class="section-body row-gauges-8" style="min-height:140px;">
+      <div class="panel" id="gauge-slot-0"></div>
+      <div class="panel" id="gauge-slot-1"></div>
+      <div class="panel" id="gauge-slot-2"></div>
+      <div class="panel" id="gauge-slot-3"></div>
+      <div class="panel" id="gauge-slot-4"></div>
+      <div class="panel" id="gauge-slot-5"></div>
+      <div class="panel" id="gauge-slot-6"></div>
+      <div class="panel" id="gauge-slot-7"></div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 3: ANÁLISE -->
+  <div class="section">
+    <div class="section-hdr" onclick="toggleSection(this)">
+      <span class="section-caret">▼</span>
+      <span class="section-title">Análise de Produção</span>
+    </div>
+    <div class="section-body row-bottom" style="min-height:220px;">
+
+      <div class="panel">
+        <div class="panel-hdr">
+          <span class="panel-title">Acumulado por Minuto</span>
+          <div style="display:flex;gap:10px;">
+            <div class="legend-item"><div class="legend-line" style="background:var(--green)"></div>Silo A</div>
+            <div class="legend-item"><div class="legend-line" style="background:var(--blue)"></div>Silo B</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="chart-wrap"><canvas id="chart-area"></canvas></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hdr"><span class="panel-title">Distribuição %</span></div>
+        <div class="panel-body" style="align-items:center;justify-content:center;gap:12px;">
+          <div style="position:relative;width:110px;height:110px;flex-shrink:0;">
+            <canvas id="chart-donut"></canvas>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;">
+              <div style="font-family:var(--font-mono);font-size:19px;color:var(--text-bright);line-height:1;" id="donut-center">0</div>
+              <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">total</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="donut-leg">
+              <div class="donut-sq" style="background:var(--green)"></div>
+              <span style="color:var(--text-secondary);font-size:11px;">Silo A</span>
+              <span style="font-family:var(--font-mono);font-size:12px;color:var(--green);margin-left:4px;" id="donut-a">0%</span>
+            </div>
+            <div class="donut-leg">
+              <div class="donut-sq" style="background:var(--blue)"></div>
+              <span style="color:var(--text-secondary);font-size:11px;">Silo B</span>
+              <span style="font-family:var(--font-mono);font-size:12px;color:var(--blue);margin-left:4px;" id="donut-b">0%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hdr"><span class="panel-title">Registros Recentes</span></div>
+        <div class="panel-body" style="padding:0;">
+          <div class="log-wrap">
+            <table class="log-table">
+              <thead><tr><th>Horário</th><th>Silo</th><th style="text-align:right">Qtd</th><th style="text-align:right">Peso</th></tr></thead>
+              <tbody id="log-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ===== HELPERS =====
+function toggleSection(hdr) {
+  const body = hdr.nextElementSibling;
+  const caret = hdr.querySelector('.section-caret');
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? 'grid' : 'none';
+  caret.textContent = collapsed ? '▼' : '▶';
+}
+
+// ===== STORE =====
+const Store = (() => {
+  const state = { siloA:0, siloB:0, registros:[], minuteData:{}, ratesHistory:[], totalPeso:0, ultimaHora:'--:--:--' };
+  const listeners = {};
+  const on = (ev,fn) => { if(!listeners[ev]) listeners[ev]=[]; listeners[ev].push(fn); };
+  const emit = (ev,d) => (listeners[ev]||[]).forEach(fn=>fn(d));
+
+  function addSaca(silo, qty=1, peso=50) {
+    const now = new Date();
+    const hora = now.toTimeString().slice(0,8);
+    const min  = now.toTimeString().slice(0,5);
+    if(silo==='Silo_A') state.siloA+=qty; else state.siloB+=qty;
+    state.totalPeso += peso*qty;
+    state.ultimaHora = hora;
+    state.registros.unshift({hora,silo,qty,peso});
+    if(state.registros.length>200) state.registros.pop();
+    if(!state.minuteData[min]) state.minuteData[min]={A:0,B:0};
+    if(silo==='Silo_A') state.minuteData[min].A+=qty; else state.minuteData[min].B+=qty;
+    const keys=Object.keys(state.minuteData).sort(); if(keys.length>20) delete state.minuteData[keys[0]];
+    state.ratesHistory.push({ts:now.getTime(),qty}); if(state.ratesHistory.length>60) state.ratesHistory.shift();
+    emit('update', snap()); emit('new-saca',{hora,silo,qty,peso});
+  }
+
+  function snap() {
+    const total=state.siloA+state.siloB;
+    const pctA=total?Math.round(state.siloA/total*100):0;
+    const now=Date.now();
+    const ritmo=state.ratesHistory.filter(r=>now-r.ts<60000).reduce((a,r)=>a+r.qty,0);
+    return {siloA:state.siloA,siloB:state.siloB,total,pctA,pctB:total?100-pctA:0,
+            pesoTon:(state.totalPeso/1000).toFixed(2),ritmo,ultimaHora:state.ultimaHora,
+            minuteData:{...state.minuteData},registros:[...state.registros]};
+  }
+
+  function setRunning(v){ state.isRunning=v; emit('running-change',v); }
+
+  function reset(){
+    state.siloA=0; state.siloB=0; state.registros=[]; state.minuteData={};
+    state.ratesHistory=[]; state.totalPeso=0; state.ultimaHora='--:--:--';
+    emit('update',snap()); emit('reset');
+  }
+  return {on,addSaca,setRunning,reset};
+})();
+
+// ===== SIMULATOR =====
+const Simulator = (() => {
+  let id=null;
+  const cfg={probA:0.52,peso:50,ms:2800};
+  function tick(){ Store.addSaca(Math.random()<cfg.probA?'Silo_A':'Silo_B',1,cfg.peso); }
+  function start(){ if(id)return; tick(); id=setInterval(tick,cfg.ms); Store.setRunning(true); }
+  function stop(){ clearInterval(id); id=null; Store.setRunning(false); }
+  function toggle(){ id?stop():start(); }
+  return {start,stop,toggle};
+})();
+
+// ===== CHARTS =====
+const Charts = (() => {
+  const C={
+    green:'#73bf69', gFill:'rgba(115,191,105,0.12)',
+    blue:'#5794f2',  bFill:'rgba(87,148,242,0.12)',
+    grid:'rgba(255,255,255,0.04)', tick:'#545454'
+  };
+  const BASE={
+    responsive:true, maintainAspectRatio:false, animation:{duration:250},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',borderColor:'#2a2a2a',borderWidth:1,
+      titleColor:'#8e8e8e',bodyColor:'#d8d9da',padding:8,
+      titleFont:{family:"'Share Tech Mono',monospace",size:11},
+      bodyFont:{family:"'Share Tech Mono',monospace",size:11}}}
+  };
+  const SC={grid:{color:C.grid,drawBorder:false},ticks:{color:C.tick,font:{size:10,family:"'Share Tech Mono',monospace"}}};
+
+  let lA,lB,bar,donut,area;
+
+  function mkLine(id,color,fill){
+    const ctx=document.getElementById(id)?.getContext('2d'); if(!ctx)return null;
+    return new Chart(ctx,{type:'line',data:{labels:[],datasets:[{data:[],borderColor:color,backgroundColor:fill,fill:true,tension:0.3,pointRadius:0,borderWidth:1.5}]},
+      options:{...BASE,scales:{x:{...SC,ticks:{...SC.ticks,maxRotation:0,maxTicksLimit:6}},y:{...SC,beginAtZero:true}}}});
+  }
+
+  function initAll(){
+    lA = mkLine('chart-line-a',C.green,C.gFill);
+    lB = mkLine('chart-line-b',C.blue, C.bFill);
+
+    const bCtx=document.getElementById('chart-bar')?.getContext('2d');
+    if(bCtx) bar=new Chart(bCtx,{type:'bar',data:{labels:['Silo A','Silo B'],datasets:[{data:[0,0],backgroundColor:[C.green,C.blue],borderRadius:2,borderSkipped:false}]},
+      options:{...BASE,scales:{x:{...SC,grid:{display:false}},y:{...SC,beginAtZero:true}}}});
+
+    const dCtx=document.getElementById('chart-donut')?.getContext('2d');
+    if(dCtx) donut=new Chart(dCtx,{type:'doughnut',data:{labels:['Silo A','Silo B'],datasets:[{data:[1,1],backgroundColor:[C.green,C.blue],borderWidth:0,hoverOffset:4}]},
+      options:{...BASE,cutout:'72%'}});
+
+    const aCtx=document.getElementById('chart-area')?.getContext('2d');
+    if(aCtx) area=new Chart(aCtx,{type:'line',data:{labels:[],datasets:[
+      {label:'A',data:[],borderColor:C.green,backgroundColor:C.gFill,fill:true,tension:0.3,pointRadius:0,borderWidth:1.5},
+      {label:'B',data:[],borderColor:C.blue, backgroundColor:C.bFill, fill:true,tension:0.3,pointRadius:0,borderWidth:1.5}]},
+      options:{...BASE,scales:{x:{...SC,ticks:{...SC.ticks,maxTicksLimit:6,maxRotation:0}},y:{...SC,beginAtZero:true}}}});
+  }
+
+  function update(s){
+    const {siloA,siloB,pctA,pctB,minuteData}=s;
+    const keys=Object.keys(minuteData).sort().slice(-14);
+    if(lA){lA.data.labels=keys;lA.data.datasets[0].data=keys.map(k=>minuteData[k]?.A||0);lA.update('none');}
+    if(lB){lB.data.labels=keys;lB.data.datasets[0].data=keys.map(k=>minuteData[k]?.B||0);lB.update('none');}
+    if(bar){bar.data.datasets[0].data=[siloA,siloB];bar.update('none');}
+    if(donut){donut.data.datasets[0].data=[pctA||1,pctB||1];donut.update('none');}
+    if(area){
+      let cA=0,cB=0;
+      area.data.labels=keys;
+      area.data.datasets[0].data=keys.map(k=>{cA+=minuteData[k]?.A||0;return cA;});
+      area.data.datasets[1].data=keys.map(k=>{cB+=minuteData[k]?.B||0;return cB;});
+      area.update('none');
+    }
+  }
+  return {initAll,update};
+})();
+
+// ===== UI + GAUGES =====
+const UI = (() => {
+  const $=id=>document.getElementById(id);
+
+  const GAUGES=[
+    {name:'SILO-A-01',base:72},{name:'SILO-A-02',base:45},
+    {name:'SILO-B-01',base:88},{name:'SILO-B-02',base:31},
+    {name:'SILO-B-03',base:55},{name:'SILO-C-01',base:14},
+    {name:'SILO-C-02',base:62},{name:'SILO-C-03',base:77},
+  ];
+  let gv=GAUGES.map(g=>g.base+Math.random()*4-2);
+
+  const R=42,CX=60,CY=58,SWEEP=220;
+  const CIRC=2*Math.PI*R, ARC=SWEEP/360*CIRC;
+  const S=160, E=380;
+
+  function pt(deg){const r=(deg-90)*Math.PI/180;return{x:CX+R*Math.cos(r),y:CY+R*Math.sin(r)};}
+  function arc(s,e){const a=pt(s),b=pt(e),lg=(e-s)>180?1:0;return `M${a.x} ${a.y} A${R} ${R} 0 ${lg} 1 ${b.x} ${b.y}`;}
+  function gColor(v){return v>=80?'var(--gauge-crit)':v>=60?'var(--gauge-warn)':'var(--gauge-ok)';}
+  function gClass(v){return v>=80?'alert-crit':v>=60?'alert-warn':'alert-ok';}
+
+  function buildGauge(slot,name,pct){
+    const color=gColor(pct);
+    const fl=(pct/100)*ARC, gap=ARC-fl;
+    slot.innerHTML=`
+      <div class="panel-hdr">
+        <span class="panel-title" style="font-size:10px;">${name}</span>
+        <span class="alert-dot ${gClass(pct)}"></span>
+      </div>
+      <div class="gauge-wrap">
+        <svg width="120" height="82" viewBox="0 0 120 90" style="overflow:visible">
+          <path d="${arc(S,E)}" fill="none" stroke="var(--gauge-track)" stroke-width="7"/>
+          <path id="gf-${name}" d="${arc(S,E)}" fill="none" stroke="${color}" stroke-width="7"
+            stroke-dasharray="${fl} ${gap+0.01}" style="transition:stroke-dasharray .6s ease,stroke .4s;"/>
+          <text x="60" y="61" text-anchor="middle" dominant-baseline="central"
+            font-family="'Share Tech Mono',monospace" font-size="13" fill="white">${Math.round(pct)}%</text>
+        </svg>
+      </div>`;
+  }
+
+  function initGauges(){ GAUGES.forEach((g,i)=>{ const s=$(` gauge-slot-${i}`)||document.getElementById('gauge-slot-'+i); if(s) buildGauge(s,g.name,gv[i]); }); }
+
+  function tickGauges(){
+    gv=gv.map((v,i)=>{
+      const drift=(Math.random()-.47)*0.5;
+      return Math.min(98,Math.max(4,v+drift));
+    });
+    gv.forEach((v,i)=>{
+      const name=GAUGES[i].name;
+      const path=document.getElementById('gf-'+name);
+      const txt=document.querySelector(`#gauge-slot-${i} text`);
+      const dot=document.querySelector(`#gauge-slot-${i} .alert-dot`);
+      const fl=(v/100)*ARC, gap=ARC-fl;
+      if(path){path.setAttribute('stroke-dasharray',`${fl} ${gap+.01}`);path.setAttribute('stroke',gColor(v));}
+      if(txt) txt.textContent=Math.round(v)+'%';
+      if(dot) dot.className='alert-dot '+gClass(v);
+    });
+  }
+
+  function flash(el){
+    if(!el)return;
+    el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'),600);
+  }
+
+  function updateKPIs(s){
+    const{total,siloA,siloB,pctA,pctB,ritmo,ultimaHora,pesoTon,minuteData}=s;
+    const set=(id,v)=>{const e=$(id);if(e&&e.dataset.v!==String(v)){e.dataset.v=v;e.textContent=v;flash(e);}};
+    set('kpi-total',total); set('kpi-ritmo',ritmo);
+    set('kpi-hora',ultimaHora); set('kpi-peso',pesoTon);
+    set('donut-center',total);
+    const da=$('donut-a'); if(da)da.textContent=pctA+'%';
+    const db=$('donut-b'); if(db)db.textContent=pctB+'%';
+
+    const valsA=Object.values(minuteData).map(k=>k?.A||0);
+    const valsB=Object.values(minuteData).map(k=>k?.B||0);
+    const setStat=(vals,pfx)=>{
+      if(!vals.length)return;
+      const mn=$('stat-'+pfx+'-min'),av=$('stat-'+pfx+'-avg'),cu=$('stat-'+pfx+'-cur');
+      if(mn)mn.textContent=Math.min(...vals);
+      if(av)av.textContent=(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);
+      if(cu)cu.textContent=vals[vals.length-1]||0;
+    };
+    setStat(valsA,'a'); setStat(valsB,'b');
+  }
+
+  function addLogRow({hora,silo,qty,peso}){
+    const tbody=$('log-tbody'); if(!tbody)return;
+    const isA=silo==='Silo_A';
+    const tr=document.createElement('tr'); tr.className='new-row';
+    tr.innerHTML=`<td>${hora}</td><td class="${isA?'tag-a':'tag-b'}">${silo.replace('_',' ')}</td><td style="text-align:right">${qty}</td><td style="text-align:right">${peso}kg</td>`;
+    tbody.insertBefore(tr,tbody.firstChild);
+    while(tbody.children.length>14)tbody.removeChild(tbody.lastChild);
+  }
+
+  function updateClock(){const e=$('header-clock');if(e)e.textContent=new Date().toTimeString().slice(0,8);}
+  function setBadgeLive(r){const b=$('badge-live');if(!b)return;b.className='live-badge'+(r?'':' paused');b.querySelector('.dot-label').textContent=r?'AO VIVO':'PAUSADO';}
+  function setPlayBtn(r){const b=$('btn-toggle');if(b)b.innerHTML=r?'⏸ Pausar':'▶ Iniciar';}
+
+  return {initGauges,tickGauges,updateKPIs,addLogRow,updateClock,setBadgeLive,setPlayBtn};
+})();
+
+// ===== BOOTSTRAP =====
+document.addEventListener('DOMContentLoaded',()=>{
+  Charts.initAll();
+  UI.initGauges();
+
+  Store.on('update',s=>{ UI.updateKPIs(s); UI.tickGauges(); Charts.update(s); });
+  Store.on('new-saca',r=>UI.addLogRow(r));
+  Store.on('running-change',r=>{UI.setBadgeLive(r);UI.setPlayBtn(r);});
+  Store.on('reset',()=>{ const t=document.getElementById('log-tbody'); if(t)t.innerHTML=''; });
+
+  UI.updateClock();
+  setInterval(UI.updateClock,1000);
+
+  document.getElementById('btn-toggle')?.addEventListener('click',()=>Simulator.toggle());
+  document.getElementById('btn-reset')?.addEventListener('click',()=>Store.reset());
+
+  Simulator.start();
+  UI.setBadgeLive(true);
+  UI.setPlayBtn(true);
+});
+</script>
+</body>
+</html>
